@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tienda</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=Poppins:wght@300;400;500;600;700&display=swap');
 
@@ -202,9 +202,15 @@ a{color:inherit;}
 .panel-head h3{font-family:'Poppins'; font-weight:500; font-size:17px;}
 .close-x{width:32px; height:32px; border-radius:50%; background:#f2ede6; display:flex; align-items:center; justify-content:center;}
 
+.detail-modal{
+  background:#fff; width:min(640px, 94vw); max-height:92vh; overflow-y:auto; border-radius:20px;
+  animation:popin .16s ease;
+}
+@media (min-width:700px){ .detail-modal{ width:min(880px, 90vw); } }
+
 /* product detail */
-.detail-imgs{display:flex; gap:2px; overflow-x:auto;}
-.detail-imgs img{width:100%; flex:0 0 100%; height:340px; object-fit:cover; scroll-snap-align:start;}
+.detail-imgs{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:4px;}
+.detail-imgs img{width:100%; height:auto; display:block; cursor:zoom-in;}
 .detail-body{padding:20px 22px 30px; display:flex; flex-direction:column; gap:14px;}
 .detail-price{font-family:'Poppins'; font-size:26px; font-weight:500;}
 .detail-desc{font-size:14.5px; line-height:1.6; color:var(--ink-soft);}
@@ -218,6 +224,15 @@ a{color:inherit;}
 }
 .primary-btn:active{transform:scale(.98);}
 .ghost-btn{background:#f2ede6; color:var(--ink); padding:12px; border-radius:14px; font-size:14px; text-align:center;}
+.lightbox{
+  position:fixed; inset:0; background:rgba(15,12,10,.94); z-index:300;
+  display:flex; align-items:center; justify-content:center; padding:24px;
+}
+.lightbox img{max-width:100%; max-height:100%; object-fit:contain;}
+.lightbox-close{
+  position:absolute; top:18px; right:18px; width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,.15); color:#fff; display:flex; align-items:center; justify-content:center;
+}
 
 /* cart */
 .cart-item{display:flex; gap:12px; padding:14px 20px; border-bottom:1px solid #f1ece3;}
@@ -415,7 +430,7 @@ async function fileToCompressedDataUrl(file, maxW=850, quality=0.68){
   // 1) intento rápido: el navegador decodifica el archivo directo (funciona con HEIC en algunos sistemas)
   if(window.createImageBitmap){
     try{
-      const bitmap = await createImageBitmap(file);
+      const bitmap = await createImageBitmap(file, {imageOrientation:'from-image'});
       const url = drawToDataUrl(bitmap, bitmap.width, bitmap.height, maxW, quality);
       bitmap.close && bitmap.close();
       return url;
@@ -528,6 +543,10 @@ async function updateOrderStock(items){
 /* ============================================================
    UTIL
    ============================================================ */
+function productTitle(p){
+  const sub = (p.subcategory||'').trim();
+  return sub ? `${sub} ${p.name}` : p.name;
+}
 function fmtPrice(n){
   return '$' + Number(n||0).toLocaleString('es-AR');
 }
@@ -740,7 +759,7 @@ function productCardHtml(p){
       <span class="price-tag" style="background:${(PALETTES[sectionById(p.sector)?.theme]||PALETTES.rosa).a1};">${fmtPrice(p.price)}</span>
     </div>
     <div class="card-body">
-      <div class="card-name">${p.name}</div>
+      <div class="card-name">${productTitle(p)}</div>
       <div class="card-tags">
         <span class="tag">${p.estado}</span>
         ${p.medidas ? `<span class="tag">${p.medidas}</span>`:''}
@@ -754,6 +773,13 @@ function productCardHtml(p){
 /* ============================================================
    DETAIL OVERLAY
    ============================================================ */
+function openLightbox(src){
+  const lb = document.createElement('div');
+  lb.className = 'lightbox';
+  lb.innerHTML = `<button class="lightbox-close">${ICONS.close}</button><img src="${src}" />`;
+  lb.onclick = (e)=>{ if(e.target===lb || e.target.closest('.lightbox-close')) lb.remove(); };
+  document.body.appendChild(lb);
+}
 function openDetailOverlay(){
   const p = detailProduct;
   const imgs = p.images || [];
@@ -774,12 +800,12 @@ function openDetailOverlay(){
     </div>` : '';
 
   const container = document.createElement('div');
-  container.className = 'overlay';
+  container.className = 'overlay center';
   container.id = 'detail-overlay';
   container.innerHTML = `
-    <div class="panel">
-      <div class="panel-head"><h3>${p.name}</h3><button class="close-x" id="detail-close">${ICONS.close}</button></div>
-      <div class="detail-imgs">${imgs.length ? imgs.map(src=>`<img src="${src}" />`).join('') : `<div style="width:100%;height:340px;background:#eee5da;display:flex;align-items:center;justify-content:center;color:#a89a89;font-size:13px;">Sin fotos todavía</div>`}</div>
+    <div class="detail-modal">
+      <div class="panel-head"><h3>${productTitle(p)}</h3><button class="close-x" id="detail-close">${ICONS.close}</button></div>
+      <div class="detail-imgs">${imgs.length ? imgs.map((src,i)=>`<img src="${src}" data-lightbox="${i}" />`).join('') : `<div style="width:100%;height:280px;background:#eee5da;display:flex;align-items:center;justify-content:center;color:#a89a89;font-size:13px;">Sin fotos todavía</div>`}</div>
       <div class="detail-body">
         <div class="detail-price">${fmtPrice(p.price)}</div>
         ${p.description ? `<div class="detail-desc">${p.description}</div>` : ''}
@@ -799,6 +825,9 @@ function openDetailOverlay(){
       </div>
     </div>`;
   document.body.appendChild(container);
+  container.querySelectorAll('[data-lightbox]').forEach(img=>{
+    img.onclick = ()=> openLightbox(img.src);
+  });
   let qty = 1;
   const addBtn = container.querySelector('#detail-add');
   const updateMax = ()=>{
@@ -848,7 +877,7 @@ function renderCartOverlay(){
     return `<div class="cart-item">
       <img src="${img||''}" />
       <div class="cart-item-info">
-        <div class="cart-item-top"><span class="cart-item-name">${p.name}${variantLabel?` <small style="color:#a89a89;">(${variantLabel})</small>`:''}</span><span class="cart-item-price">${fmtPrice(p.price*ci.qty)}</span></div>
+        <div class="cart-item-top"><span class="cart-item-name">${productTitle(p)}${variantLabel?` <small style="color:#a89a89;">(${variantLabel})</small>`:''}</span><span class="cart-item-price">${fmtPrice(p.price*ci.qty)}</span></div>
         <div class="cart-qty">
           <button data-cartminus="${key}">−</button>
           <span>${ci.qty}</span>
@@ -944,7 +973,7 @@ async function confirmOrder(){
   const items = cart.map(ci=>{
     const p = catalog.find(x=>x.id===ci.id);
     const variantLabel = [ci.talle, ci.color].filter(Boolean).join(' - ');
-    return {id:ci.id, variantId: ci.variantId, name:p?p.name:'—', variantLabel, price:p?p.price:0, qty:ci.qty};
+    return {id:ci.id, variantId: ci.variantId, name:p?productTitle(p):'—', variantLabel, price:p?p.price:0, qty:ci.qty};
   });
   const total = cartTotal();
   const order = {
