@@ -379,6 +379,7 @@ async function loadAll(){
 }
 function goHome(){ view='home'; if(location.hash) history.replaceState(null,'',location.pathname+location.search); render(); }
 function goAdmin(){ location.hash = 'admin'; view = adminAuthed ? 'admin' : 'admin-login'; render(); }
+function openAdminInNewTab(){ window.open(location.pathname + location.search + '#admin', '_blank'); }
 async function loadOrders(){
   const { data } = await sb.from('orders').select('*').order('created_at', {ascending:false});
   orders = (data || []).map(o => ({
@@ -956,7 +957,7 @@ function attachCommonEvents(){
   const back = document.getElementById('btn-back-home');
   if(back) back.onclick = goHome;
   const adminLink = document.getElementById('btn-admin-link');
-  if(adminLink) adminLink.onclick = goAdmin;
+  if(adminLink) adminLink.onclick = openAdminInNewTab;
   document.querySelectorAll('[data-detail]').forEach(c=>{
     c.addEventListener('click', (e)=>{
       if(e.target.closest('[data-addcart]')) return;
