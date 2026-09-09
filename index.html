@@ -72,10 +72,26 @@ a{color:inherit;}
   line-height:1.5; opacity:.85; max-width:160px;
 }
 .hero-title{
-  font-family:'Poppins'; font-weight:300; font-size:clamp(52px, 11vw, 96px);
-  line-height:.95; margin:26px 0 10px;
+  font-family:'Poppins'; font-weight:300; font-size:clamp(60px, 13vw, 118px);
+  line-height:.92; margin:26px 0 10px;
 }
 .hero-sub{font-size:17px; max-width:420px; line-height:1.5; opacity:.9;}
+.delivery-banner{
+  margin:0 20px 18px; padding:20px 22px; background:#fff; border-radius:18px;
+  display:flex; flex-direction:column; gap:12px; box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.delivery-opt{font-size:16px; line-height:1.45;}
+.delivery-opt b{font-family:'Poppins'; font-weight:600; letter-spacing:.3px;}
+.whatsapp-cta{
+  margin:0 20px 26px; padding:18px 22px; background:#25D366; color:#fff; border-radius:18px;
+  display:flex; align-items:center; justify-content:center; gap:10px; text-decoration:none;
+  font-family:'Poppins'; font-weight:500; font-size:19px; text-align:center;
+}
+.whatsapp-cta:active{transform:scale(.98);}
+.promo-banner{
+  margin:0 22px 4px; padding:14px 18px; border-radius:14px; background:var(--ink); color:#fff;
+  font-size:14px; font-weight:500; text-align:center;
+}
 .hero-arrow{margin-top:34px;}
 
 /* ---------- Section grid (home) ---------- */
@@ -106,7 +122,7 @@ a{color:inherit;}
 .section-header{padding:40px 22px 34px;}
 .back-row{display:flex; align-items:center; gap:8px; font-size:14px; margin-bottom:22px; opacity:.85;}
 .back-row button{background:none; color:inherit; display:flex; align-items:center; gap:6px;}
-.section-title{font-family:'Poppins'; font-weight:300; font-size:clamp(38px,8vw,58px);}
+.section-title{font-family:'Poppins'; font-weight:300; font-size:clamp(44px,10vw,72px);}
 
 .group-block{padding:26px 0 6px;}
 .group-title{padding:0 22px 14px; font-family:'Poppins'; font-size:19px; font-weight:500;}
@@ -256,6 +272,16 @@ a{color:inherit;}
 .section-chip{padding:8px 14px; border-radius:20px; font-size:13px; background:#f2ede6; display:flex; align-items:center; gap:8px;}
 .small-x{width:18px; height:18px; border-radius:50%; background:rgba(0,0,0,.12); font-size:11px; display:flex; align-items:center; justify-content:center;}
 .confirm-screen{padding:60px 24px; text-align:center; min-height:70vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;}
+.variant-chips{display:flex; gap:8px; flex-wrap:wrap; margin:2px 0;}
+.variant-chip{
+  padding:9px 14px; border-radius:20px; font-size:13.5px; border:1.5px solid #e2dbcf; background:#fbf9f5;
+}
+.variant-chip.selected{background:var(--ink); color:#fff; border-color:var(--ink);}
+.variant-chip.disabled{opacity:.35; text-decoration:line-through; pointer-events:none;}
+.variant-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+.variant-row input{flex:1; padding:9px 11px; border:1px solid #e2dbcf; border-radius:10px; font-size:13.5px;}
+.promo-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+.promo-row input, .promo-row select{padding:9px 11px; border:1px solid #e2dbcf; border-radius:10px; font-size:13.5px;}
 </style>
 </head>
 <body>
@@ -300,6 +326,7 @@ let adminTab = 'productos';
 let productFormEdit = null;  // product row being edited, or 'new'
 let productFormImages = [];  // public URLs already uploaded for the product being edited
 let productFormPendingId = null; // temp id used for storage path before the row exists
+let productFormVariants = []; // [{id, talle, color, quantity}]
 let detailProduct = null;
 let checkoutData = {name:'', phone:'', delivery:'retiro', payment:'efectivo', notes:''};
 let lastOrderSummary = null;
@@ -311,14 +338,16 @@ async function loadAll(){
   const { data: cfgRow } = await sb.from('store_config').select('*').eq('id', 1).single();
   config = cfgRow ? {
     storeName: cfgRow.store_name, tagline: cfgRow.tagline, whatsapp: cfgRow.whatsapp,
-    alias: cfgRow.alias, addressRef: cfgRow.address_ref, sections: cfgRow.sections || []
-  } : { storeName:'Mi tienda', tagline:'', whatsapp:'', alias:'', addressRef:'', sections:[] };
+    alias: cfgRow.alias, addressRef: cfgRow.address_ref, sections: cfgRow.sections || [],
+    deliveryPickup: cfgRow.delivery_pickup || '', deliveryShipping: cfgRow.delivery_shipping || '',
+    promos: cfgRow.promos || []
+  } : { storeName:'Mi tienda', tagline:'', whatsapp:'', alias:'', addressRef:'', sections:[], deliveryPickup:'', deliveryShipping:'', promos:[] };
 
   const { data: prodRows } = await sb.from('products').select('*').order('created_at', {ascending:true});
   catalog = (prodRows || []).map(r => ({
     id:r.id, sector:r.sector, subcategory:r.subcategory, name:r.name, description:r.description,
     estado:r.estado, material:r.material, medidas:r.medidas, price:r.price, quantity:r.quantity,
-    stock:r.stock, images:r.images || []
+    stock:r.stock, images:r.images || [], variants:r.variants || []
   }));
 
   const { data: { session } } = await sb.auth.getSession();
@@ -342,6 +371,9 @@ async function saveConfigFields(fields){
   if('alias' in fields) dbFields.alias = fields.alias;
   if('addressRef' in fields) dbFields.address_ref = fields.addressRef;
   if('sections' in fields) dbFields.sections = fields.sections;
+  if('deliveryPickup' in fields) dbFields.delivery_pickup = fields.deliveryPickup;
+  if('deliveryShipping' in fields) dbFields.delivery_shipping = fields.deliveryShipping;
+  if('promos' in fields) dbFields.promos = fields.promos;
   const { error } = await sb.from('store_config').update(dbFields).eq('id', 1);
   if(error){ showToast('No se pudo guardar: ' + error.message); return false; }
   Object.assign(config, fields);
@@ -356,12 +388,12 @@ async function uploadProductImage(file, productId){
   const { data } = sb.storage.from('product-photos').getPublicUrl(path);
   return data.publicUrl;
 }
-async function saveProduct(data, images, existingId){
+async function saveProduct(data, images, variants, existingId){
   if(existingId){
     const { error } = await sb.from('products').update({
       sector:data.sector, subcategory:data.subcategory, name:data.name, description:data.description,
       estado:data.estado, material:data.material, medidas:data.medidas, price:data.price,
-      quantity:data.quantity, images
+      quantity:data.quantity, images, variants
     }).eq('id', existingId);
     if(error){ showToast('Error guardando: ' + error.message); return null; }
     return existingId;
@@ -369,7 +401,7 @@ async function saveProduct(data, images, existingId){
     const { data: row, error } = await sb.from('products').insert({
       id: productFormPendingId, sector:data.sector, subcategory:data.subcategory, name:data.name,
       description:data.description, estado:data.estado, material:data.material, medidas:data.medidas,
-      price:data.price, quantity:data.quantity, images, stock:true
+      price:data.price, quantity:data.quantity, images, variants, stock:true
     }).select().single();
     if(error){ showToast('Error guardando: ' + error.message); return null; }
     return row.id;
@@ -393,10 +425,17 @@ async function updateOrderStock(items){
   for(const it of items){
     const p = catalog.find(x=>x.id===it.id);
     if(!p) continue;
-    const newQty = Math.max(0, (p.quantity||1) - it.qty);
-    const newStock = newQty > 0;
-    await sb.from('products').update({quantity:newQty, stock:newStock}).eq('id', p.id);
-    p.quantity = newQty; p.stock = newStock;
+    if(it.variantId){
+      const variants = (p.variants||[]).map(v=> v.id===it.variantId ? {...v, quantity: Math.max(0, (v.quantity||0)-it.qty)} : v);
+      const newStock = variants.some(v=>(v.quantity||0)>0);
+      await sb.from('products').update({variants, stock:newStock}).eq('id', p.id);
+      p.variants = variants; p.stock = newStock;
+    }else{
+      const newQty = Math.max(0, (p.quantity||1) - it.qty);
+      const newStock = newQty > 0;
+      await sb.from('products').update({quantity:newQty, stock:newStock}).eq('id', p.id);
+      p.quantity = newQty; p.stock = newStock;
+    }
   }
 }
 
@@ -442,6 +481,12 @@ function compressImage(file, maxW=1000, quality=0.75){
     reader.readAsDataURL(file);
   });
 }
+function cartKey(id, variantId){ return id + '::' + (variantId||''); }
+function variantStock(p, variantId){
+  if(!variantId) return Math.max(0, p.quantity||1);
+  const v = (p.variants||[]).find(v=>v.id===variantId);
+  return v ? Math.max(0, v.quantity||0) : 0;
+}
 function cartTotal(){
   return cart.reduce((sum, ci)=>{
     const p = catalog.find(x=>x.id===ci.id);
@@ -449,23 +494,24 @@ function cartTotal(){
   }, 0);
 }
 function cartCount(){ return cart.reduce((s,c)=>s+c.qty,0); }
-function addToCart(id, qty=1){
-  const existing = cart.find(c=>c.id===id);
+function addToCart(id, variant, qty=1){
+  const key = cartKey(id, variant && variant.id);
+  const existing = cart.find(c=>cartKey(c.id,c.variantId)===key);
   if(existing) existing.qty += qty;
-  else cart.push({id, qty});
+  else cart.push({id, variantId: variant ? variant.id : null, talle: variant ? variant.talle : null, color: variant ? variant.color : null, qty});
   showToast('Agregado al carrito ✓');
   render();
 }
-function setQty(id, qty){
-  const it = cart.find(c=>c.id===id);
+function setQty(key, qty){
+  const it = cart.find(c=>cartKey(c.id,c.variantId)===key);
   if(!it) return;
-  const p = catalog.find(x=>x.id===id);
-  const max = p ? Math.max(1, p.quantity||1) : 99;
+  const p = catalog.find(x=>x.id===it.id);
+  const max = p ? Math.max(1, variantStock(p, it.variantId)||1) : 99;
   it.qty = Math.max(1, Math.min(qty, max));
   render();
 }
-function removeFromCart(id){
-  cart = cart.filter(c=>c.id!==id);
+function removeFromCart(key){
+  cart = cart.filter(c=>cartKey(c.id,c.variantId)!==key);
   render();
 }
 
@@ -539,19 +585,23 @@ function renderHome(){
   <div class="wash hero" style="${vars}">
     <div class="hero-top">
       <div></div>
-      <div class="hero-eyebrow">${cartCount()>0 ? cartCount()+' en tu carrito' : 'todo debe salir'}</div>
+      <div class="hero-eyebrow">${cartCount()>0 ? cartCount()+' en tu carrito' : ''}</div>
     </div>
     <h1 class="hero-title">${config.storeName}</h1>
     <p class="hero-sub">${config.tagline}</p>
     <div class="hero-arrow">${ICONS.arrow}</div>
   </div>
+  <div class="delivery-banner">
+    ${config.deliveryPickup ? `<div class="delivery-opt">${config.deliveryPickup.replace(/^([A-ZÁÉÍÓÚ]+):?\\s*/,'<b>$1</b> ')}</div>` : ''}
+    ${config.deliveryShipping ? `<div class="delivery-opt">${config.deliveryShipping.replace(/^([A-ZÁÉÍÓÚ]+):?\\s*/,'<b>$1</b> ')}</div>` : ''}
+  </div>
+  <a class="whatsapp-cta" href="https://wa.me/${config.whatsapp}" target="_blank">${ICONS.whatsapp} ¿Dudas? Escribinos al WhatsApp</a>
   <div class="section-index">
     <div class="index-label">Elegí qué querés ver</div>
     <div class="tile-grid">${tiles}</div>
   </div>
   <div class="footer-strip">
     <span>📍 Retiro en ${config.addressRef}</span>
-    <span>💬 <a href="https://wa.me/${config.whatsapp}" target="_blank">Escribinos por WhatsApp</a></span>
     <button id="btn-admin-link" style="background:none; border:none; text-decoration:underline; text-underline-offset:3px; cursor:pointer; color:inherit; font-size:inherit; padding:0;">Panel de administración</button>
   </div>`;
 }
@@ -589,12 +639,15 @@ function renderSectionPage(){
     <div class="back-row"><button id="btn-back-home">${ICONS.back} Volver</button></div>
     <h2 class="section-title">${s.label}</h2>
   </div>
+  ${(config.promos||[]).filter(pr=>pr.sector===s.id).map(pr=>`<div class="promo-banner">🔥 ${pr.label}</div>`).join('')}
   ${body}
   `;
 }
 
 function productCardHtml(p){
   const img = p.images && p.images[0];
+  const variants = (p.variants||[]).filter(v=>v.quantity>0);
+  const talles = [...new Set(variants.map(v=>v.talle).filter(Boolean))];
   return `<div class="card" data-detail="${p.id}">
     <div class="card-img">
       ${img ? `<img src="${img}" loading="lazy" />` : `<span style="color:#b8ab9c; font-size:11px;">sin foto</span>`}
@@ -602,7 +655,11 @@ function productCardHtml(p){
     </div>
     <div class="card-body">
       <div class="card-name">${p.name}</div>
-      <div class="card-tags"><span class="tag">${p.estado}</span>${p.medidas ? `<span class="tag">${p.medidas}</span>`:''}</div>
+      <div class="card-tags">
+        <span class="tag">${p.estado}</span>
+        ${p.medidas ? `<span class="tag">${p.medidas}</span>`:''}
+        ${talles.length ? `<span class="tag">Talles: ${talles.join(', ')}</span>` : ''}
+      </div>
       <button class="want-btn" data-addcart="${p.id}">Lo quiero</button>
     </div>
   </div>`;
@@ -614,6 +671,22 @@ function productCardHtml(p){
 function openDetailOverlay(){
   const p = detailProduct;
   const imgs = p.images || [];
+  const variants = p.variants || [];
+  const hasVariants = variants.length > 0;
+  let selectedVariant = null;
+
+  const chipsHtml = hasVariants ? `
+    <div class="field">
+      <label>Elegí talle${variants.some(v=>v.color)?' / color':''}</label>
+      <div class="variant-chips" id="variant-chips">
+        ${variants.map(v=>{
+          const label = [v.talle, v.color].filter(Boolean).join(' - ') || 'Único';
+          const disabled = (v.quantity||0) <= 0;
+          return `<button class="variant-chip ${disabled?'disabled':''}" data-variant="${v.id}" ${disabled?'disabled':''}>${label}${disabled?' (agotado)':''}</button>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
   const container = document.createElement('div');
   container.className = 'overlay';
   container.id = 'detail-overlay';
@@ -628,24 +701,49 @@ function openDetailOverlay(){
           <div><span>Estado</span>${p.estado}</div>
           ${p.material ? `<div><span>Material</span>${p.material}</div>` : ''}
           ${p.medidas ? `<div><span>Medidas</span>${p.medidas}</div>` : ''}
-          <div><span>Disponibles</span>${p.quantity||1}</div>
+          ${!hasVariants ? `<div><span>Disponibles</span>${p.quantity||1}</div>` : ''}
         </div>
+        ${chipsHtml}
         <div class="qty-row">
           <button class="qty-btn" id="detail-qty-minus">−</button>
           <span id="detail-qty-val">1</span>
           <button class="qty-btn" id="detail-qty-plus">+</button>
         </div>
-        <button class="primary-btn" id="detail-add">Lo quiero — agregar al carrito</button>
+        <button class="primary-btn" id="detail-add" ${hasVariants?'disabled style="opacity:.5;"':''}>${hasVariants ? 'Elegí un talle primero' : 'Lo quiero — agregar al carrito'}</button>
       </div>
     </div>`;
   document.body.appendChild(container);
   let qty = 1;
-  const maxQ = Math.max(1, p.quantity||1);
+  const addBtn = container.querySelector('#detail-add');
+  const updateMax = ()=>{
+    const maxQ = hasVariants ? (selectedVariant ? Math.max(1, selectedVariant.quantity||1) : 1) : Math.max(1, p.quantity||1);
+    qty = Math.min(qty, maxQ);
+    container.querySelector('#detail-qty-val').textContent = qty;
+    return maxQ;
+  };
   container.querySelector('#detail-close').onclick = ()=>{ detailProduct=null; container.remove(); };
   container.onclick = (e)=>{ if(e.target===container){ detailProduct=null; container.remove(); } };
   container.querySelector('#detail-qty-minus').onclick = ()=>{ qty=Math.max(1,qty-1); container.querySelector('#detail-qty-val').textContent=qty; };
-  container.querySelector('#detail-qty-plus').onclick = ()=>{ qty=Math.min(maxQ,qty+1); container.querySelector('#detail-qty-val').textContent=qty; };
-  container.querySelector('#detail-add').onclick = ()=>{ addToCart(p.id, qty); detailProduct=null; container.remove(); };
+  container.querySelector('#detail-qty-plus').onclick = ()=>{ const maxQ=updateMax(); qty=Math.min(maxQ,qty+1); container.querySelector('#detail-qty-val').textContent=qty; };
+  if(hasVariants){
+    container.querySelectorAll('[data-variant]').forEach(chip=>{
+      chip.onclick = ()=>{
+        selectedVariant = variants.find(v=>v.id===chip.dataset.variant);
+        container.querySelectorAll('[data-variant]').forEach(c=>c.classList.remove('selected'));
+        chip.classList.add('selected');
+        qty = 1;
+        updateMax();
+        addBtn.disabled = false;
+        addBtn.style.opacity = '1';
+        addBtn.textContent = 'Lo quiero — agregar al carrito';
+      };
+    });
+  }
+  addBtn.onclick = ()=>{
+    if(hasVariants && !selectedVariant) return;
+    addToCart(p.id, selectedVariant, qty);
+    detailProduct=null; container.remove();
+  };
 }
 
 /* ============================================================
@@ -659,15 +757,17 @@ function renderCartOverlay(){
     const p = catalog.find(x=>x.id===ci.id);
     if(!p) return '';
     const img = p.images && p.images[0];
+    const key = cartKey(ci.id, ci.variantId);
+    const variantLabel = [ci.talle, ci.color].filter(Boolean).join(' - ');
     return `<div class="cart-item">
       <img src="${img||''}" />
       <div class="cart-item-info">
-        <div class="cart-item-top"><span class="cart-item-name">${p.name}</span><span class="cart-item-price">${fmtPrice(p.price*ci.qty)}</span></div>
+        <div class="cart-item-top"><span class="cart-item-name">${p.name}${variantLabel?` <small style="color:#a89a89;">(${variantLabel})</small>`:''}</span><span class="cart-item-price">${fmtPrice(p.price*ci.qty)}</span></div>
         <div class="cart-qty">
-          <button data-cartminus="${p.id}">−</button>
+          <button data-cartminus="${key}">−</button>
           <span>${ci.qty}</span>
-          <button data-cartplus="${p.id}">+</button>
-          <button class="trash-btn" data-cartremove="${p.id}" style="margin-left:auto;">Quitar</button>
+          <button data-cartplus="${key}">+</button>
+          <button class="trash-btn" data-cartremove="${key}" style="margin-left:auto;">Quitar</button>
         </div>
       </div>
     </div>`;
@@ -685,8 +785,8 @@ function renderCartOverlay(){
   document.body.appendChild(container);
   container.querySelector('#cart-close').onclick = ()=>{ cartOpenFlag=false; container.remove(); };
   container.onclick = (e)=>{ if(e.target===container){ cartOpenFlag=false; container.remove(); } };
-  container.querySelectorAll('[data-cartplus]').forEach(b=> b.onclick = ()=>{ const it=cart.find(c=>c.id===b.dataset.cartplus); setQty(it.id, it.qty+1); container.remove(); renderCartOverlay(); });
-  container.querySelectorAll('[data-cartminus]').forEach(b=> b.onclick = ()=>{ const it=cart.find(c=>c.id===b.dataset.cartminus); setQty(it.id, it.qty-1); container.remove(); renderCartOverlay(); });
+  container.querySelectorAll('[data-cartplus]').forEach(b=> b.onclick = ()=>{ const it=cart.find(c=>cartKey(c.id,c.variantId)===b.dataset.cartplus); setQty(b.dataset.cartplus, it.qty+1); container.remove(); renderCartOverlay(); });
+  container.querySelectorAll('[data-cartminus]').forEach(b=> b.onclick = ()=>{ const it=cart.find(c=>cartKey(c.id,c.variantId)===b.dataset.cartminus); setQty(b.dataset.cartminus, it.qty-1); container.remove(); renderCartOverlay(); });
   container.querySelectorAll('[data-cartremove]').forEach(b=> b.onclick = ()=>{ removeFromCart(b.dataset.cartremove); container.remove(); if(cart.length) renderCartOverlay(); else { cartOpenFlag=false; } });
   const chk = container.querySelector('#btn-checkout');
   if(chk) chk.onclick = ()=>{ cartOpenFlag=false; checkoutOpenFlag=true; container.remove(); renderCheckoutOverlay(); };
@@ -757,7 +857,8 @@ function renderCheckoutOverlay(){
 async function confirmOrder(){
   const items = cart.map(ci=>{
     const p = catalog.find(x=>x.id===ci.id);
-    return {id:ci.id, name:p?p.name:'—', price:p?p.price:0, qty:ci.qty};
+    const variantLabel = [ci.talle, ci.color].filter(Boolean).join(' - ');
+    return {id:ci.id, variantId: ci.variantId, name:p?p.name:'—', variantLabel, price:p?p.price:0, qty:ci.qty};
   });
   const total = cartTotal();
   const order = {
@@ -770,7 +871,7 @@ async function confirmOrder(){
   await insertOrder(order);
   await updateOrderStock(items);
 
-  const lines = items.map(it=>`• ${it.qty}x ${it.name} — ${fmtPrice(it.price*it.qty)}`).join('%0A');
+  const lines = items.map(it=>`• ${it.qty}x ${it.name}${it.variantLabel?' ('+it.variantLabel+')':''} — ${fmtPrice(it.price*it.qty)}`).join('%0A');
   const msg = `Hola! Soy ${checkoutData.name}, quiero confirmar este pedido:%0A%0A${lines}%0A%0ATotal: ${fmtPrice(total)}%0AEntrega: ${checkoutData.delivery==='retiro'?'Retiro en Devoto':'Envío a coordinar'}%0APago: ${checkoutData.payment==='efectivo'?'Efectivo':'Transferencia'}${checkoutData.notes ? '%0ANotas: '+checkoutData.notes : ''}%0A%0AMi WhatsApp: ${checkoutData.phone}`;
   window.open(`https://wa.me/${config.whatsapp}?text=${msg}`, '_blank');
 
@@ -825,7 +926,12 @@ function attachCommonEvents(){
     });
   });
   document.querySelectorAll('[data-addcart]').forEach(b=>{
-    b.onclick = (e)=>{ e.stopPropagation(); addToCart(b.dataset.addcart, 1); };
+    b.onclick = (e)=>{
+      e.stopPropagation();
+      const p = catalog.find(x=>x.id===b.dataset.addcart);
+      if(p && (p.variants||[]).length){ detailProduct = p; openDetailOverlay(); return; }
+      addToCart(b.dataset.addcart, null, 1);
+    };
   });
 }
 
@@ -912,7 +1018,7 @@ function renderAdminProductos(){
 function renderAdminPedidos(){
   if(orders.length===0) return `<div class="empty-note">Todavía no hay pedidos.</div>`;
   return orders.map(o=>{
-    const itemsHtml = o.items.map(it=>`${it.qty}x ${it.name} (${fmtPrice(it.price*it.qty)})`).join('<br>');
+    const itemsHtml = o.items.map(it=>`${it.qty}x ${it.name}${it.variantLabel?' ('+it.variantLabel+')':''} (${fmtPrice(it.price*it.qty)})`).join('<br>');
     const date = new Date(o.timestamp).toLocaleString('es-AR', {dateStyle:'short', timeStyle:'short'});
     return `<div class="order-card">
       <div class="order-top">
@@ -939,6 +1045,12 @@ function renderAdminConfig(){
       <span class="small-x" data-delsection="${s.id}">✕</span>
     </div>`).join('');
   const paletteOptions = Object.keys(PALETTES).map(k=>`<option value="${k}">${PALETTE_NAMES[k]}</option>`).join('');
+  const sectionOptsForPromo = (config.sections||[]).map(s=>`<option value="${s.id}">${s.label}</option>`).join('');
+  const promosHtml = (config.promos||[]).map(pr=>`
+    <div class="section-chip">
+      <span>[${sectionById(pr.sector)?.label||pr.sector}] ${pr.label}</span>
+      <span class="small-x" data-delpromo="${pr.id}">✕</span>
+    </div>`).join('');
 
   return `
     <div class="field"><label>Nombre de la tienda</label><input id="cfg-name" value="${config.storeName}" /></div>
@@ -946,6 +1058,8 @@ function renderAdminConfig(){
     <div class="field"><label>WhatsApp (con código de país, sin +)</label><input id="cfg-whatsapp" value="${config.whatsapp}" /></div>
     <div class="field"><label>Alias para transferencias</label><input id="cfg-alias" value="${config.alias}" /></div>
     <div class="field"><label>Dirección de referencia (retiro)</label><input id="cfg-address" value="${config.addressRef}" /></div>
+    <div class="field"><label>Texto de retiro (portada)</label><input id="cfg-delivery-pickup" value="${config.deliveryPickup||''}" /></div>
+    <div class="field"><label>Texto de envío (portada)</label><input id="cfg-delivery-shipping" value="${config.deliveryShipping||''}" /></div>
     <button class="ghost-btn" id="btn-save-config" style="margin-bottom:26px;">Guardar cambios</button>
 
     <div class="group-title" style="padding:0 0 10px;">Secciones</div>
@@ -955,6 +1069,15 @@ function renderAdminConfig(){
       <select id="new-section-theme" style="padding:11px 13px; border:1px solid #e2dbcf; border-radius:12px;">${paletteOptions}</select>
       <button class="ghost-btn" id="btn-add-section">Agregar</button>
     </div>
+
+    <div class="group-title" style="padding:0 0 10px;">Promos</div>
+    <div class="section-chip-row">${promosHtml || '<span style="font-size:13px; color:#a89a89;">Sin promos activas</span>'}</div>
+    <div class="promo-row">
+      <select id="new-promo-sector">${sectionOptsForPromo}</select>
+      <input id="new-promo-label" placeholder="ej: 5 tops x $55.000" style="flex:1;" />
+      <button class="ghost-btn" id="btn-add-promo">Agregar</button>
+    </div>
+    <p style="font-size:11.5px; color:#a89a89; margin-bottom:26px;">Esto muestra un cartel arriba de la sección — el precio de la promo se cobra a mano al coordinar el pedido, no se calcula solo en el carrito.</p>
 
     <div class="group-title" style="padding:0 0 10px;">Cambiar tu contraseña</div>
     <div class="field"><input id="cfg-password" type="password" placeholder="Nueva contraseña (mín. 6 caracteres)" /></div>
@@ -968,6 +1091,13 @@ function renderProductFormOverlay(){
   const p = isNew ? {sector:(config.sections[0]&&config.sections[0].id)||'', subcategory:'', name:'', description:'', estado:'Usado', material:'', medidas:'', price:'', quantity:1} : productFormEdit;
   const sectionOpts = (config.sections||[]).map(s=>`<option value="${s.id}" ${p.sector===s.id?'selected':''}>${s.label}</option>`).join('');
   const imgsHtml = productFormImages.map((src,i)=>`<div class="thumb"><img src="${src}"/><div class="rm" data-rmimg="${i}">✕</div></div>`).join('');
+  const variantsHtml = productFormVariants.map((v,i)=>`
+    <div class="variant-row">
+      <input data-vfield="talle" data-vidx="${i}" placeholder="Talle (ej: 38)" value="${v.talle||''}" />
+      <input data-vfield="color" data-vidx="${i}" placeholder="Color (opcional)" value="${v.color||''}" />
+      <input data-vfield="quantity" data-vidx="${i}" type="number" min="0" placeholder="Cant." style="max-width:70px;" value="${v.quantity||0}" />
+      <button class="icon-btn" data-rmvariant="${i}">✕</button>
+    </div>`).join('');
 
   return `
   <div class="overlay center" id="product-form-overlay">
@@ -987,7 +1117,16 @@ function renderProductFormOverlay(){
         <div class="field"><label>Material</label><input id="pf-material" value="${p.material||''}" /></div>
         <div class="field"><label>Medidas (si aplica)</label><input id="pf-medidas" value="${p.medidas||''}" /></div>
         <div class="field"><label>Precio</label><input id="pf-price" type="number" value="${p.price||''}" /></div>
-        <div class="field"><label>Cantidad disponible</label><input id="pf-quantity" type="number" min="1" value="${p.quantity||1}" /></div>
+        <div class="field">
+          <label>${productFormVariants.length ? 'Cantidad (no se usa si hay variantes abajo)' : 'Cantidad disponible'}</label>
+          <input id="pf-quantity" type="number" min="1" value="${p.quantity||1}" />
+        </div>
+        <div class="field">
+          <label>Variantes de talle / color (opcional)</label>
+          <div id="variant-rows">${variantsHtml}</div>
+          <button class="ghost-btn" id="btn-add-variant" type="button">+ Agregar variante</button>
+          <span style="font-size:11.5px; color:#a89a89;">Si cargás variantes, cada una tiene su propio stock y la clienta elige talle/color antes de comprar.</span>
+        </div>
         <div class="field">
           <label>Fotos (podés elegir varias juntas)</label>
           <input id="pf-photos" type="file" accept="image/*" multiple />
@@ -1014,12 +1153,13 @@ function attachAdminEvents(){
 
   if(adminTab==='productos'){
     const nb = document.getElementById('btn-new-product');
-    if(nb) nb.onclick = ()=>{ productFormEdit='new'; productFormImages=[]; productFormPendingId=uid(); render(); };
+    if(nb) nb.onclick = ()=>{ productFormEdit='new'; productFormImages=[]; productFormVariants=[]; productFormPendingId=uid(); render(); };
     document.querySelectorAll('[data-editprod]').forEach(b=>{
       b.onclick = ()=>{
         const prod = catalog.find(x=>x.id===b.dataset.editprod);
         productFormEdit = prod;
         productFormImages = [...(prod.images||[])];
+        productFormVariants = (prod.variants||[]).map(v=>({...v}));
         productFormPendingId = prod.id;
         render();
       };
@@ -1060,7 +1200,9 @@ function attachAdminEvents(){
         tagline: document.getElementById('cfg-tagline').value.trim(),
         whatsapp: document.getElementById('cfg-whatsapp').value.trim(),
         alias: document.getElementById('cfg-alias').value.trim(),
-        addressRef: document.getElementById('cfg-address').value.trim()
+        addressRef: document.getElementById('cfg-address').value.trim(),
+        deliveryPickup: document.getElementById('cfg-delivery-pickup').value.trim(),
+        deliveryShipping: document.getElementById('cfg-delivery-shipping').value.trim()
       });
       if(ok){ showToast('Datos guardados'); render(); }
     };
@@ -1081,6 +1223,21 @@ function attachAdminEvents(){
       const id = label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || uid();
       const newSections = [...(config.sections||[]), {id, label, theme}];
       const ok = await saveConfigFields({sections:newSections});
+      if(ok) render();
+    };
+    document.querySelectorAll('[data-delpromo]').forEach(b=>{
+      b.onclick = async ()=>{
+        const newPromos = (config.promos||[]).filter(pr=>pr.id!==b.dataset.delpromo);
+        const ok = await saveConfigFields({promos:newPromos});
+        if(ok) render();
+      };
+    });
+    document.getElementById('btn-add-promo').onclick = async ()=>{
+      const sector = document.getElementById('new-promo-sector').value;
+      const label = document.getElementById('new-promo-label').value.trim();
+      if(!label){ showToast('Escribí el texto de la promo'); return; }
+      const newPromos = [...(config.promos||[]), {id:uid(), sector, label}];
+      const ok = await saveConfigFields({promos:newPromos});
       if(ok) render();
     };
     document.getElementById('btn-save-password').onclick = async ()=>{
@@ -1115,10 +1272,26 @@ function attachAdminEvents(){
     pf.querySelectorAll('[data-rmimg]').forEach(b=>{
       b.onclick = ()=>{ productFormImages.splice(Number(b.dataset.rmimg),1); render(); };
     });
+    const addVariantBtn = document.getElementById('btn-add-variant');
+    if(addVariantBtn) addVariantBtn.onclick = ()=>{
+      productFormVariants.push({id:uid(), talle:'', color:'', quantity:1});
+      render();
+    };
+    pf.querySelectorAll('[data-rmvariant]').forEach(b=>{
+      b.onclick = ()=>{ productFormVariants.splice(Number(b.dataset.rmvariant),1); render(); };
+    });
+    pf.querySelectorAll('[data-vfield]').forEach(inp=>{
+      inp.onchange = ()=>{
+        const idx = Number(inp.dataset.vidx);
+        const field = inp.dataset.vfield;
+        productFormVariants[idx][field] = field==='quantity' ? Math.max(0, Number(inp.value)||0) : inp.value;
+      };
+    });
     document.getElementById('pf-save').onclick = async ()=>{
       const name = document.getElementById('pf-name').value.trim();
       const price = Number(document.getElementById('pf-price').value);
       if(!name || !price){ showToast('Completá al menos nombre y precio'); return; }
+      const cleanVariants = productFormVariants.filter(v=>v.talle||v.color).map(v=>({id:v.id, talle:v.talle.trim(), color:(v.color||'').trim(), quantity:Math.max(0, Number(v.quantity)||0)}));
       const data = {
         sector: document.getElementById('pf-sector').value,
         subcategory: document.getElementById('pf-subcategory').value.trim(),
@@ -1131,15 +1304,16 @@ function attachAdminEvents(){
         quantity: Math.max(1, Number(document.getElementById('pf-quantity').value)||1),
       };
       const existingId = productFormEdit === 'new' ? null : productFormEdit.id;
-      const savedId = await saveProduct(data, productFormImages, existingId);
+      const savedId = await saveProduct(data, productFormImages, cleanVariants, existingId);
       if(!savedId) return;
       if(existingId){
-        Object.assign(productFormEdit, data, {images:[...productFormImages]});
+        Object.assign(productFormEdit, data, {images:[...productFormImages], variants:cleanVariants});
       }else{
-        catalog.push({id:savedId, stock:true, ...data, images:[...productFormImages]});
+        catalog.push({id:savedId, stock:true, ...data, images:[...productFormImages], variants:cleanVariants});
       }
       productFormEdit = null;
       productFormImages = [];
+      productFormVariants = [];
       showToast('Producto guardado ✓');
       render();
     };
