@@ -1090,14 +1090,6 @@ function renderProductFormOverlay(){
   const isNew = productFormEdit === 'new';
   const p = isNew ? {sector:(config.sections[0]&&config.sections[0].id)||'', subcategory:'', name:'', description:'', estado:'Usado', material:'', medidas:'', price:'', quantity:1} : productFormEdit;
   const sectionOpts = (config.sections||[]).map(s=>`<option value="${s.id}" ${p.sector===s.id?'selected':''}>${s.label}</option>`).join('');
-  const imgsHtml = productFormImages.map((src,i)=>`<div class="thumb"><img src="${src}"/><div class="rm" data-rmimg="${i}">✕</div></div>`).join('');
-  const variantsHtml = productFormVariants.map((v,i)=>`
-    <div class="variant-row">
-      <input data-vfield="talle" data-vidx="${i}" placeholder="Talle (ej: 38)" value="${v.talle||''}" />
-      <input data-vfield="color" data-vidx="${i}" placeholder="Color (opcional)" value="${v.color||''}" />
-      <input data-vfield="quantity" data-vidx="${i}" type="number" min="0" placeholder="Cant." style="max-width:70px;" value="${v.quantity||0}" />
-      <button class="icon-btn" data-rmvariant="${i}">✕</button>
-    </div>`).join('');
 
   return `
   <div class="overlay center" id="product-form-overlay">
@@ -1118,19 +1110,19 @@ function renderProductFormOverlay(){
         <div class="field"><label>Medidas (si aplica)</label><input id="pf-medidas" value="${p.medidas||''}" /></div>
         <div class="field"><label>Precio</label><input id="pf-price" type="number" value="${p.price||''}" /></div>
         <div class="field">
-          <label>${productFormVariants.length ? 'Cantidad (no se usa si hay variantes abajo)' : 'Cantidad disponible'}</label>
+          <label id="pf-qty-label">${productFormVariants.length ? 'Cantidad (no se usa si hay variantes abajo)' : 'Cantidad disponible'}</label>
           <input id="pf-quantity" type="number" min="1" value="${p.quantity||1}" />
         </div>
         <div class="field">
           <label>Variantes de talle / color (opcional)</label>
-          <div id="variant-rows">${variantsHtml}</div>
+          <div id="variant-rows"></div>
           <button class="ghost-btn" id="btn-add-variant" type="button">+ Agregar variante</button>
           <span style="font-size:11.5px; color:#a89a89;">Si cargás variantes, cada una tiene su propio stock y la clienta elige talle/color antes de comprar.</span>
         </div>
         <div class="field">
           <label>Fotos (podés elegir varias juntas)</label>
           <input id="pf-photos" type="file" accept="image/*" multiple />
-          <div class="thumb-row" id="pf-thumbs">${imgsHtml}</div>
+          <div class="thumb-row" id="pf-thumbs"></div>
           <span id="pf-upload-status" style="font-size:11.5px; color:#a89a89;"></span>
         </div>
         <button class="primary-btn" id="pf-save">Guardar producto</button>
@@ -1258,35 +1250,69 @@ function attachAdminEvents(){
     pf.querySelectorAll('[data-estado]').forEach(b=>{
       b.onclick = ()=>{ currentEstado = b.dataset.estado; pf.querySelectorAll('[data-estado]').forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
     });
+
+    // ---- thumbnails (added/removed without re-rendering the whole form) ----
+    const thumbsEl = document.getElementById('pf-thumbs');
+    function addThumbEl(url){
+      const div = document.createElement('div');
+      div.className = 'thumb';
+      const img = document.createElement('img'); img.src = url;
+      const rm = document.createElement('div'); rm.className = 'rm'; rm.textContent = '✕';
+      rm.onclick = ()=>{
+        const i = productFormImages.indexOf(url);
+        if(i>-1) productFormImages.splice(i,1);
+        div.remove();
+      };
+      div.appendChild(img); div.appendChild(rm);
+      thumbsEl.appendChild(div);
+    }
+    productFormImages.forEach(addThumbEl);
     document.getElementById('pf-photos').onchange = async (e)=>{
       const files = Array.from(e.target.files);
       const statusEl = document.getElementById('pf-upload-status');
       for(let i=0;i<files.length;i++){
         statusEl.textContent = `Subiendo foto ${i+1} de ${files.length}...`;
         const url = await uploadProductImage(files[i], productFormPendingId);
-        if(url) productFormImages.push(url);
+        if(url){ productFormImages.push(url); addThumbEl(url); }
       }
       statusEl.textContent = '';
-      render();
+      e.target.value = '';
     };
-    pf.querySelectorAll('[data-rmimg]').forEach(b=>{
-      b.onclick = ()=>{ productFormImages.splice(Number(b.dataset.rmimg),1); render(); };
-    });
-    const addVariantBtn = document.getElementById('btn-add-variant');
-    if(addVariantBtn) addVariantBtn.onclick = ()=>{
-      productFormVariants.push({id:uid(), talle:'', color:'', quantity:1});
-      render();
-    };
-    pf.querySelectorAll('[data-rmvariant]').forEach(b=>{
-      b.onclick = ()=>{ productFormVariants.splice(Number(b.dataset.rmvariant),1); render(); };
-    });
-    pf.querySelectorAll('[data-vfield]').forEach(inp=>{
-      inp.onchange = ()=>{
-        const idx = Number(inp.dataset.vidx);
-        const field = inp.dataset.vfield;
-        productFormVariants[idx][field] = field==='quantity' ? Math.max(0, Number(inp.value)||0) : inp.value;
+
+    // ---- variant rows (added/removed without re-rendering the whole form) ----
+    const rowsEl = document.getElementById('variant-rows');
+    const qtyLabel = document.getElementById('pf-qty-label');
+    function updateQtyLabel(){
+      qtyLabel.textContent = productFormVariants.length ? 'Cantidad (no se usa si hay variantes abajo)' : 'Cantidad disponible';
+    }
+    function addVariantRowEl(variant){
+      const div = document.createElement('div');
+      div.className = 'variant-row';
+      div.innerHTML = `
+        <input placeholder="Talle (ej: 38)" value="${variant.talle||''}" />
+        <input placeholder="Color (opcional)" value="${variant.color||''}" />
+        <input type="number" min="0" placeholder="Cant." style="max-width:70px;" value="${variant.quantity||0}" />
+        <button class="icon-btn" type="button">✕</button>`;
+      const [talleInp, colorInp, qtyInp] = div.querySelectorAll('input');
+      talleInp.oninput = ()=>{ variant.talle = talleInp.value; };
+      colorInp.oninput = ()=>{ variant.color = colorInp.value; };
+      qtyInp.oninput = ()=>{ variant.quantity = Math.max(0, Number(qtyInp.value)||0); };
+      div.querySelector('button').onclick = ()=>{
+        const i = productFormVariants.indexOf(variant);
+        if(i>-1) productFormVariants.splice(i,1);
+        div.remove();
+        updateQtyLabel();
       };
-    });
+      rowsEl.appendChild(div);
+    }
+    productFormVariants.forEach(addVariantRowEl);
+    document.getElementById('btn-add-variant').onclick = ()=>{
+      const variant = {id:uid(), talle:'', color:'', quantity:1};
+      productFormVariants.push(variant);
+      addVariantRowEl(variant);
+      updateQtyLabel();
+    };
+
     document.getElementById('pf-save').onclick = async ()=>{
       const name = document.getElementById('pf-name').value.trim();
       const price = Number(document.getElementById('pf-price').value);
