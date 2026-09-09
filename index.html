@@ -1022,6 +1022,7 @@ function renderAdminProductos(){
             <div class="m">${fmtPrice(p.price)} · ${p.estado} · stock: ${p.quantity||1}</div>
           </div>
           <div class="switch ${p.stock?'on':''}" data-stocktoggle="${p.id}" title="Disponible / Agotado"></div>
+          <button class="icon-btn" data-dupprod="${p.id}" title="Duplicar">📋</button>
           <button class="icon-btn" data-editprod="${p.id}">✎</button>
           <button class="icon-btn" data-delprod="${p.id}">🗑</button>
         </div>`).join('');
@@ -1106,14 +1107,14 @@ function renderAdminConfig(){
 
 /* ---------- product form overlay ---------- */
 function renderProductFormOverlay(){
-  const isNew = productFormEdit === 'new';
-  const p = isNew ? {sector:(config.sections[0]&&config.sections[0].id)||'', subcategory:'', name:'', description:'', estado:'Usado', material:'', medidas:'', price:'', quantity:1} : productFormEdit;
+  const isNew = productFormEdit === 'new' || !!(productFormEdit && productFormEdit._duplicate);
+  const p = productFormEdit === 'new' ? {sector:(config.sections[0]&&config.sections[0].id)||'', subcategory:'', name:'', description:'', estado:'Usado', material:'', medidas:'', price:'', quantity:1} : productFormEdit;
   const sectionOpts = (config.sections||[]).map(s=>`<option value="${s.id}" ${p.sector===s.id?'selected':''}>${s.label}</option>`).join('');
 
   return `
   <div class="overlay center" id="product-form-overlay">
     <div class="sheet">
-      <div class="panel-head"><h3>${isNew?'Nuevo producto':'Editar producto'}</h3><button class="close-x" id="pf-close">${ICONS.close}</button></div>
+      <div class="panel-head"><h3>${productFormEdit && productFormEdit._duplicate ? 'Copia de producto' : (isNew?'Nuevo producto':'Editar producto')}</h3><button class="close-x" id="pf-close">${ICONS.close}</button></div>
       <div class="detail-body">
         <div class="field"><label>Sección</label><select id="pf-sector">${sectionOpts}</select></div>
         <div class="field"><label>Subcategoría (para agrupar, ej: Vestidos, Sillas...)</label><input id="pf-subcategory" value="${p.subcategory||''}" /></div>
@@ -1172,6 +1173,16 @@ function attachAdminEvents(){
         productFormImages = [...(prod.images||[])];
         productFormVariants = (prod.variants||[]).map(v=>({...v}));
         productFormPendingId = prod.id;
+        render();
+      };
+    });
+    document.querySelectorAll('[data-dupprod]').forEach(b=>{
+      b.onclick = ()=>{
+        const prod = catalog.find(x=>x.id===b.dataset.dupprod);
+        productFormEdit = {...prod, _duplicate:true, name: prod.name + ' (copia)'};
+        productFormImages = [...(prod.images||[])];
+        productFormVariants = (prod.variants||[]).map(v=>({...v, id:uid()}));
+        productFormPendingId = uid();
         render();
       };
     });
@@ -1263,6 +1274,7 @@ function attachAdminEvents(){
 
   const pf = document.getElementById('product-form-overlay');
   if(pf){
+    const isNewProd = productFormEdit === 'new' || !!(productFormEdit && productFormEdit._duplicate);
     let currentEstado = (productFormEdit==='new') ? 'Usado' : productFormEdit.estado;
     document.getElementById('pf-close').onclick = ()=>{ productFormEdit=null; render(); };
     pf.onclick = (e)=>{ if(e.target===pf){ productFormEdit=null; render(); } };
@@ -1348,7 +1360,7 @@ function attachAdminEvents(){
         price,
         quantity: Math.max(1, Number(document.getElementById('pf-quantity').value)||1),
       };
-      const existingId = productFormEdit === 'new' ? null : productFormEdit.id;
+      const existingId = isNewProd ? null : productFormEdit.id;
       const savedId = await saveProduct(data, productFormImages, cleanVariants, existingId);
       if(!savedId) return;
       if(existingId){
