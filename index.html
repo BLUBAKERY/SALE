@@ -300,7 +300,9 @@ a{color:inherit;}
 .order-items{font-size:13px; color:var(--ink-soft); line-height:1.6; margin:8px 0;}
 .status-select{margin-top:8px;}
 .thumb-row{display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;}
-.thumb{position:relative; width:56px; height:56px; border-radius:8px; overflow:hidden; background:#eee5da;}
+.thumb{position:relative; width:72px; height:72px; border-radius:8px; overflow:hidden; background:#eee5da;}
+.thumb-order{position:absolute; bottom:0; left:0; right:0; display:flex; justify-content:space-between; padding:2px;}
+.thumb-mv{width:20px; height:20px; border-radius:4px; background:rgba(0,0,0,.55); color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;}
 .thumb img{width:100%; height:100%; object-fit:cover;}
 .thumb .rm{position:absolute; top:1px; right:1px; width:16px; height:16px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; font-size:10px; display:flex; align-items:center; justify-content:center;}
 .section-chip-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
@@ -375,8 +377,9 @@ async function loadAll(){
     storeName: cfgRow.store_name, tagline: cfgRow.tagline, whatsapp: cfgRow.whatsapp,
     alias: cfgRow.alias, addressRef: cfgRow.address_ref, sections: cfgRow.sections || [],
     deliveryPickup: cfgRow.delivery_pickup || '', deliveryShipping: cfgRow.delivery_shipping || '',
+    showroomInfo: cfgRow.showroom_info || '',
     promos: cfgRow.promos || []
-  } : { storeName:'Mi tienda', tagline:'', whatsapp:'', alias:'', addressRef:'', sections:[], deliveryPickup:'', deliveryShipping:'', promos:[] };
+  } : { storeName:'Mi tienda', tagline:'', whatsapp:'', alias:'', addressRef:'', sections:[], deliveryPickup:'', deliveryShipping:'', showroomInfo:'', promos:[] };
 
   const { data: prodRows } = await sb.from('products').select('*').order('created_at', {ascending:true});
   catalog = (prodRows || []).map(r => ({
@@ -412,6 +415,7 @@ async function saveConfigFields(fields){
   if('sections' in fields) dbFields.sections = fields.sections;
   if('deliveryPickup' in fields) dbFields.delivery_pickup = fields.deliveryPickup;
   if('deliveryShipping' in fields) dbFields.delivery_shipping = fields.deliveryShipping;
+  if('showroomInfo' in fields) dbFields.showroom_info = fields.showroomInfo;
   if('promos' in fields) dbFields.promos = fields.promos;
   const { error } = await sb.from('store_config').update(dbFields).eq('id', 1);
   if(error){ showToast('No se pudo guardar: ' + error.message); return false; }
@@ -699,6 +703,8 @@ function renderHome(){
   <div class="delivery-banner">
     ${config.deliveryPickup ? `<div class="delivery-opt">${config.deliveryPickup.replace(/^([A-ZÁÉÍÓÚ]+):?\\s*/,'<b>$1</b> ')}</div>` : ''}
     ${config.deliveryShipping ? `<div class="delivery-opt">${config.deliveryShipping.replace(/^([A-ZÁÉÍÓÚ]+):?\\s*/,'<b>$1</b> ')}</div>` : ''}
+    ${config.showroomInfo ? `<div class="delivery-opt">${config.showroomInfo}</div>` : ''}
+    ${config.addressRef ? `<iframe class="map-frame" loading="lazy" src="https://www.google.com/maps?q=${encodeURIComponent(config.addressRef)}&output=embed"></iframe>` : ''}
   </div>
   <a class="whatsapp-cta" href="https://wa.me/${config.whatsapp}" target="_blank">${ICONS.whatsapp} ¿Dudas? Escribinos al WhatsApp</a>
   <div class="section-index">
@@ -1173,6 +1179,7 @@ function renderAdminConfig(){
     <div class="field"><label>Dirección de referencia (retiro)</label><input id="cfg-address" value="${config.addressRef}" /></div>
     <div class="field"><label>Texto de retiro (portada)</label><input id="cfg-delivery-pickup" value="${config.deliveryPickup||''}" /></div>
     <div class="field"><label>Texto de envío (portada)</label><input id="cfg-delivery-shipping" value="${config.deliveryShipping||''}" /></div>
+    <div class="field"><label>Info de showroom / cita previa (portada)</label><input id="cfg-showroom" value="${config.showroomInfo||''}" /></div>
     <button class="ghost-btn" id="btn-save-config" style="margin-bottom:26px;">Guardar cambios</button>
 
     <div class="group-title" style="padding:0 0 10px;">Secciones</div>
@@ -1317,7 +1324,8 @@ function attachAdminEvents(){
         alias: document.getElementById('cfg-alias').value.trim(),
         addressRef: document.getElementById('cfg-address').value.trim(),
         deliveryPickup: document.getElementById('cfg-delivery-pickup').value.trim(),
-        deliveryShipping: document.getElementById('cfg-delivery-shipping').value.trim()
+        deliveryShipping: document.getElementById('cfg-delivery-shipping').value.trim(),
+        showroomInfo: document.getElementById('cfg-showroom').value.trim()
       });
       if(ok){ showToast('Datos guardados'); render(); }
     };
@@ -1377,20 +1385,30 @@ function attachAdminEvents(){
 
     // ---- thumbnails (added/removed without re-rendering the whole form) ----
     const thumbsEl = document.getElementById('pf-thumbs');
-    function addThumbEl(url){
-      const div = document.createElement('div');
-      div.className = 'thumb';
-      const img = document.createElement('img'); img.src = url;
-      const rm = document.createElement('div'); rm.className = 'rm'; rm.textContent = '✕';
-      rm.onclick = ()=>{
-        const i = productFormImages.indexOf(url);
-        if(i>-1) productFormImages.splice(i,1);
-        div.remove();
-      };
-      div.appendChild(img); div.appendChild(rm);
-      thumbsEl.appendChild(div);
+    function renderThumbs(){
+      thumbsEl.innerHTML = '';
+      productFormImages.forEach((url, idx)=>{
+        const div = document.createElement('div');
+        div.className = 'thumb';
+        div.innerHTML = `
+          <img src="${url}" />
+          <div class="rm">✕</div>
+          <div class="thumb-order">
+            ${idx>0 ? `<button class="thumb-mv" data-dir="-1">◀</button>` : `<span></span>`}
+            ${idx<productFormImages.length-1 ? `<button class="thumb-mv" data-dir="1">▶</button>` : `<span></span>`}
+          </div>`;
+        div.querySelector('.rm').onclick = ()=>{ productFormImages.splice(idx,1); renderThumbs(); };
+        div.querySelectorAll('.thumb-mv').forEach(b=>{
+          b.onclick = ()=>{
+            const j = idx + Number(b.dataset.dir);
+            [productFormImages[idx], productFormImages[j]] = [productFormImages[j], productFormImages[idx]];
+            renderThumbs();
+          };
+        });
+        thumbsEl.appendChild(div);
+      });
     }
-    productFormImages.forEach(addThumbEl);
+    renderThumbs();
     document.getElementById('pf-photos').onchange = async (e)=>{
       const files = Array.from(e.target.files);
       const statusEl = document.getElementById('pf-upload-status');
@@ -1402,7 +1420,7 @@ function attachAdminEvents(){
         while(nextIdx < files.length){
           const file = files[nextIdx++];
           const url = await uploadProductImage(file, productFormPendingId);
-          if(url){ productFormImages.push(url); addThumbEl(url); }
+          if(url){ productFormImages.push(url); renderThumbs(); }
           completed++;
           statusEl.textContent = `Subiendo fotos... ${completed} de ${total}`;
         }
