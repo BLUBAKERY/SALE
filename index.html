@@ -77,12 +77,27 @@ a{color:inherit;}
   line-height:.92; margin:26px 0 10px;
 }
 .hero-sub{font-size:17px; max-width:420px; line-height:1.5; opacity:.9;}
-.delivery-banner{
-  margin:0 20px 18px; padding:20px 22px; background:#fff; border-radius:18px;
-  display:flex; flex-direction:column; gap:12px; box-shadow:0 1px 3px rgba(0,0,0,.06);
+
+.info-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(210px,1fr)); gap:12px;
+  margin:0 20px 16px;
 }
-.delivery-opt{font-size:16px; line-height:1.45;}
-.delivery-opt b{font-family:'Poppins'; font-weight:600; letter-spacing:.3px;}
+.info-card{border-radius:18px; padding:20px; color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.08);}
+.info-card .info-icon{font-size:24px; margin-bottom:8px; display:block;}
+.info-card .info-title{font-family:'Poppins'; font-weight:600; font-size:14.5px; margin-bottom:4px; letter-spacing:.2px;}
+.info-card .info-text{font-size:13px; line-height:1.45; opacity:.96;}
+
+.notice-strip{
+  margin:0 20px 14px; padding:16px 18px; border-radius:16px; background:#3a2620; color:#fbe8de;
+  font-size:14px; font-weight:500; text-align:center; line-height:1.5;
+}
+.fresh-strip{
+  margin:0 20px 22px; padding:15px 18px; border-radius:16px; background:#fff2cf; color:#5c4b1f;
+  font-size:13.5px; text-align:center; line-height:1.55;
+}
+.map-block{margin:0 20px 26px;}
+.map-heading{padding:0 2px 10px; font-family:'Poppins'; font-weight:500; font-size:16px;}
+
 .whatsapp-cta{
   margin:0 20px 26px; padding:18px 22px; background:#25D366; color:#fff; border-radius:18px;
   display:flex; align-items:center; justify-content:center; gap:10px; text-decoration:none;
@@ -98,19 +113,20 @@ a{color:inherit;}
 /* ---------- Section grid (home) ---------- */
 .section-index{padding:8px 20px 60px;}
 .index-label{
-  padding:0 4px 18px; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft);
+  padding:0 4px 18px; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;
 }
 .tile-grid{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:14px;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:16px;
 }
 .tile{
-  border-radius:var(--radius); padding:22px 18px; min-height:130px;
+  border-radius:var(--radius); padding:30px 22px; min-height:168px;
   display:flex; flex-direction:column; justify-content:space-between;
-  color:var(--tx); text-align:left; transition:transform .18s ease;
+  color:var(--tx); text-align:left; transition:transform .15s ease; box-shadow:0 2px 10px rgba(0,0,0,.07);
 }
-.tile:active{transform:scale(.97);}
-.tile .tile-name{font-family:'Poppins'; font-size:16px; font-weight:500;}
-.tile .tile-count{font-size:12px; opacity:.75; margin-top:4px;}
+.tile:active{transform:scale(.96);}
+.tile .tile-icon{font-size:32px;}
+.tile .tile-name{font-family:'Poppins'; font-size:19px; font-weight:600; margin-top:10px;}
+.tile .tile-count{font-size:12.5px; opacity:.8; margin-top:4px;}
 
 .footer-strip{
   padding:30px 24px 40px; border-top:1px solid rgba(0,0,0,.07); margin-top:20px;
@@ -378,8 +394,11 @@ async function loadAll(){
     alias: cfgRow.alias, addressRef: cfgRow.address_ref, sections: cfgRow.sections || [],
     deliveryPickup: cfgRow.delivery_pickup || '', deliveryShipping: cfgRow.delivery_shipping || '',
     showroomInfo: cfgRow.showroom_info || '',
+    paymentInfo: cfgRow.payment_info || 'Precios en efectivo o transferencia.',
+    noReturnsInfo: cfgRow.no_returns_info || 'Sale por cierre y mudanza: no se aceptan cambios ni devoluciones.',
+    freshStockInfo: cfgRow.fresh_stock_info || 'Siempre que entres vas a encontrar cosas nuevas — voy cargando el catálogo de a poco. ¡Hay muchísimo para ver, pasate seguido!',
     promos: cfgRow.promos || []
-  } : { storeName:'Mi tienda', tagline:'', whatsapp:'', alias:'', addressRef:'', sections:[], deliveryPickup:'', deliveryShipping:'', showroomInfo:'', promos:[] };
+  } : { storeName:'Mi tienda', tagline:'', whatsapp:'', alias:'', addressRef:'', sections:[], deliveryPickup:'', deliveryShipping:'', showroomInfo:'', paymentInfo:'', noReturnsInfo:'', freshStockInfo:'', promos:[] };
 
   const { data: prodRows } = await sb.from('products').select('*').order('created_at', {ascending:true});
   catalog = (prodRows || []).map(r => ({
@@ -416,6 +435,9 @@ async function saveConfigFields(fields){
   if('deliveryPickup' in fields) dbFields.delivery_pickup = fields.deliveryPickup;
   if('deliveryShipping' in fields) dbFields.delivery_shipping = fields.deliveryShipping;
   if('showroomInfo' in fields) dbFields.showroom_info = fields.showroomInfo;
+  if('paymentInfo' in fields) dbFields.payment_info = fields.paymentInfo;
+  if('noReturnsInfo' in fields) dbFields.no_returns_info = fields.noReturnsInfo;
+  if('freshStockInfo' in fields) dbFields.fresh_stock_info = fields.freshStockInfo;
   if('promos' in fields) dbFields.promos = fields.promos;
   const { error } = await sb.from('store_config').update(dbFields).eq('id', 1);
   if(error){ showToast('No se pudo guardar: ' + error.message); return false; }
@@ -677,6 +699,7 @@ function renderTopbar(){
 }
 
 /* ---------- HOME ---------- */
+const SECTION_ICONS = {ropa:'👗', accesorios:'👜', muebles:'🛋️', luminarias:'💡', insumos:'🧵', fotografia:'📷', otros:'📦'};
 function renderHome(){
   const sections = config.sections || [];
   const primaryTheme = (sections[0] || {theme:'rosa'}).theme;
@@ -684,10 +707,28 @@ function renderHome(){
   const tiles = sections.map(s=>{
     const count = catalog.filter(p=>p.sector===s.id && p.stock).length;
     const p = PALETTES[s.theme] || PALETTES.rosa;
+    const icon = SECTION_ICONS[s.id] || '🌸';
     return `<button class="tile" data-goto="${s.id}" style="background:linear-gradient(150deg, ${p.a1}, ${p.a3}); color:${p.tx};">
-      <span class="tile-name">${s.label}</span>
-      <span class="tile-count">${count} ${count===1?'producto':'productos'}</span>
+      <span class="tile-icon">${icon}</span>
+      <span>
+        <span class="tile-name">${s.label}</span><br>
+        <span class="tile-count">${count} ${count===1?'producto':'productos'}</span>
+      </span>
     </button>`;
+  }).join('');
+
+  const infoCards = [
+    {theme:'rosa', icon:'🚗', title:'Retiro', text:config.deliveryPickup},
+    {theme:'celeste', icon:'📦', title:'Envío', text:config.deliveryShipping},
+    {theme:'mostaza', icon:'🗓️', title:'Showroom', text:config.showroomInfo},
+    {theme:'verde', icon:'💵', title:'Pago', text:config.paymentInfo},
+  ].filter(c=>c.text).map(c=>{
+    const p = PALETTES[c.theme] || PALETTES.rosa;
+    return `<div class="info-card" style="background:linear-gradient(150deg, ${p.a2}, ${p.a1}); color:${p.tx};">
+      <span class="info-icon">${c.icon}</span>
+      <div class="info-title">${c.title}</div>
+      <div class="info-text">${c.text}</div>
+    </div>`;
   }).join('');
 
   return `
@@ -700,12 +741,16 @@ function renderHome(){
     <p class="hero-sub">${config.tagline}</p>
     <div class="hero-arrow">${ICONS.arrow}</div>
   </div>
-  <div class="delivery-banner">
-    ${config.deliveryPickup ? `<div class="delivery-opt">${config.deliveryPickup.replace(/^([A-ZÁÉÍÓÚ]+):?\\s*/,'<b>$1</b> ')}</div>` : ''}
-    ${config.deliveryShipping ? `<div class="delivery-opt">${config.deliveryShipping.replace(/^([A-ZÁÉÍÓÚ]+):?\\s*/,'<b>$1</b> ')}</div>` : ''}
-    ${config.showroomInfo ? `<div class="delivery-opt">${config.showroomInfo}</div>` : ''}
-    ${config.addressRef ? `<iframe class="map-frame" loading="lazy" src="https://www.google.com/maps?q=${encodeURIComponent(config.addressRef)}&output=embed"></iframe>` : ''}
-  </div>
+
+  ${infoCards ? `<div class="info-grid">${infoCards}</div>` : ''}
+  ${config.noReturnsInfo ? `<div class="notice-strip">⚠️ ${config.noReturnsInfo}</div>` : ''}
+  ${config.freshStockInfo ? `<div class="fresh-strip">✨ ${config.freshStockInfo}</div>` : ''}
+
+  ${config.addressRef ? `<div class="map-block">
+    <div class="map-heading">📍 ¿Dónde nos encontrás?</div>
+    <iframe class="map-frame" loading="lazy" src="https://www.google.com/maps?q=${encodeURIComponent(config.addressRef)}&output=embed"></iframe>
+  </div>` : ''}
+
   <a class="whatsapp-cta" href="https://wa.me/${config.whatsapp}" target="_blank">${ICONS.whatsapp} ¿Dudas? Escribinos al WhatsApp</a>
   <div class="section-index">
     <div class="index-label">Elegí qué querés ver</div>
@@ -1180,6 +1225,9 @@ function renderAdminConfig(){
     <div class="field"><label>Texto de retiro (portada)</label><input id="cfg-delivery-pickup" value="${config.deliveryPickup||''}" /></div>
     <div class="field"><label>Texto de envío (portada)</label><input id="cfg-delivery-shipping" value="${config.deliveryShipping||''}" /></div>
     <div class="field"><label>Info de showroom / cita previa (portada)</label><input id="cfg-showroom" value="${config.showroomInfo||''}" /></div>
+    <div class="field"><label>Info de pago (portada)</label><input id="cfg-payment" value="${config.paymentInfo||''}" /></div>
+    <div class="field"><label>Aviso de sin cambios/devoluciones (portada)</label><input id="cfg-noreturns" value="${config.noReturnsInfo||''}" /></div>
+    <div class="field"><label>Mensaje de novedades constantes (portada)</label><textarea id="cfg-freshstock">${config.freshStockInfo||''}</textarea></div>
     <button class="ghost-btn" id="btn-save-config" style="margin-bottom:26px;">Guardar cambios</button>
 
     <div class="group-title" style="padding:0 0 10px;">Secciones</div>
@@ -1325,7 +1373,10 @@ function attachAdminEvents(){
         addressRef: document.getElementById('cfg-address').value.trim(),
         deliveryPickup: document.getElementById('cfg-delivery-pickup').value.trim(),
         deliveryShipping: document.getElementById('cfg-delivery-shipping').value.trim(),
-        showroomInfo: document.getElementById('cfg-showroom').value.trim()
+        showroomInfo: document.getElementById('cfg-showroom').value.trim(),
+        paymentInfo: document.getElementById('cfg-payment').value.trim(),
+        noReturnsInfo: document.getElementById('cfg-noreturns').value.trim(),
+        freshStockInfo: document.getElementById('cfg-freshstock').value.trim()
       });
       if(ok){ showToast('Datos guardados'); render(); }
     };
