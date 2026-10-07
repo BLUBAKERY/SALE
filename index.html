@@ -873,6 +873,7 @@ function openDetailOverlay(){
           <button class="qty-btn" id="detail-qty-plus">+</button>
         </div>
         <button class="primary-btn" id="detail-add" ${hasVariants?'disabled style="opacity:.5;"':''}>${hasVariants ? 'Elegí un talle primero' : 'Lo quiero — agregar al carrito'}</button>
+        ${config.whatsapp ? `<a class="ghost-btn" id="detail-ask" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; text-decoration:none;" href="https://wa.me/${config.whatsapp}?text=${encodeURIComponent('Hola! Quería hacerte una pregunta sobre este producto: '+productTitle(p)+' ('+fmtPrice(p.price)+')')}">${ICONS.whatsapp} Hacer una pregunta sobre este producto</a>` : ''}
       </div>
     </div>`;
   document.body.appendChild(container);
