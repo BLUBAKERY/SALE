@@ -478,6 +478,22 @@ async function fileToCompressedDataUrl(file, maxW=850, quality=0.68){
   }catch(e){ /* seguimos probando */ }
   // 3) conversión HEIC específica vía heic2any
   const isHeic = file.type === 'image/heic' || file.type === 'image/heif' || /\.hei[cf]$/i.test(file.name||'');
+  if(isHeic){
+    // A) librería moderna (soporta más variantes de HEIC), se carga solo si hace falta
+    try{
+      if(!window.HeicTo){
+        await new Promise((res,rej)=>{
+          const sc=document.createElement('script');
+          sc.src='https://cdn.jsdelivr.net/npm/heic-to@1.6.5/dist/iife/heic-to.js';
+          sc.onload=res; sc.onerror=()=>rej(new Error('no cargó heic-to'));
+          document.head.appendChild(sc);
+        });
+      }
+      const jpegBlob = await HeicTo({blob:file, type:'image/jpeg', quality:0.85});
+      const bitmap = await createImageBitmap(jpegBlob);
+      return drawToDataUrl(bitmap, bitmap.width, bitmap.height, maxW, quality);
+    }catch(e){ console.error('heic-to falló', e); }
+  }
   if(isHeic && window.heic2any){
     try{
       const converted = await heic2any({blob:file, toType:'image/jpeg', quality:0.85});
@@ -492,7 +508,7 @@ async function uploadProductImage(file, productId){
   try{
     const compressed = await Promise.race([
       fileToCompressedDataUrl(file),
-      new Promise((_,rej)=> setTimeout(()=>rej(new Error('timeout')), 25000))
+      new Promise((_,rej)=> setTimeout(()=>rej(new Error('timeout')), 45000))
     ]);
     const blob = await (await fetch(compressed)).blob();
     const path = `${productId}/${Date.now()}_${Math.random().toString(36).slice(2,7)}.jpg`;
