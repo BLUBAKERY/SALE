@@ -159,6 +159,13 @@ a{color:inherit;}
   display:flex; align-items:center; justify-content:center; overflow:hidden;
 }
 .card-img img{width:100%; height:100%; object-fit:cover;}
+.new-badge{
+  position:absolute; left:0; top:12px; z-index:2; padding:5px 10px 5px 9px;
+  background:#1f1a17; color:#fff; font-family:'Jost'; font-weight:600; font-size:10.5px; letter-spacing:.06em;
+  line-height:1.1; border-radius:0 8px 8px 0; box-shadow:0 2px 6px rgba(0,0,0,.25); max-width:62%;
+}
+.detail-imgs-wrap{position:relative;}
+.detail-imgs-wrap .new-badge{top:16px; font-size:12px; padding:7px 13px 7px 11px;}
 .price-tag{
   position:absolute; left:10px; bottom:10px; padding:6px 12px; border-radius:20px;
   font-size:14px; font-family:'Jost'; font-weight:500;
@@ -404,8 +411,10 @@ async function loadAll(){
   catalog = (prodRows || []).map(r => ({
     id:r.id, sector:r.sector, subcategory:r.subcategory, name:r.name, description:r.description,
     estado:r.estado, material:r.material, medidas:r.medidas, price:r.price, quantity:r.quantity,
-    stock:r.stock, images:r.images || [], variants:r.variants || []
+    stock:r.stock, images:r.images || [], variants:r.variants || [],
+    newTag: (r.new_tag===true||r.new_tag===false) ? r.new_tag : null
   }));
+  HAS_NEW_TAG = (prodRows||[]).length ? ('new_tag' in prodRows[0]) : HAS_NEW_TAG;
 
   const { data: { session } } = await sb.auth.getSession();
   if(session){ adminAuthed = true; adminSession = session; await loadOrders(); }
@@ -536,7 +545,8 @@ async function saveProduct(data, images, variants, existingId){
     const { error } = await sb.from('products').update({
       sector:data.sector, subcategory:data.subcategory, name:data.name, description:data.description,
       estado:data.estado, material:data.material, medidas:data.medidas, price:data.price,
-      quantity:data.quantity, images, variants
+      quantity:data.quantity, images, variants,
+      ...(HAS_NEW_TAG ? {new_tag:data.newTag} : {})
     }).eq('id', existingId);
     if(error){ showToast('Error guardando: ' + error.message); return null; }
     return existingId;
@@ -544,7 +554,8 @@ async function saveProduct(data, images, variants, existingId){
     const { data: row, error } = await sb.from('products').insert({
       id: productFormPendingId, sector:data.sector, subcategory:data.subcategory, name:data.name,
       description:data.description, estado:data.estado, material:data.material, medidas:data.medidas,
-      price:data.price, quantity:data.quantity, images, variants, stock:true
+      price:data.price, quantity:data.quantity, images, variants, stock:true,
+      ...(HAS_NEW_TAG ? {new_tag:data.newTag} : {})
     }).select().single();
     if(error){ showToast('Error guardando: ' + error.message); return null; }
     return row.id;
@@ -585,6 +596,20 @@ async function updateOrderStock(items){
 /* ============================================================
    UTIL
    ============================================================ */
+let HAS_NEW_TAG = true;
+function _norm(t){ return (t||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+const SPORTY_RE = /(deport|calza|legging|biker|short|bermuda|top\b|tops\b|musculosa|remera|buzo|campera|jogger|jogging|conjunto|enterito|mono\b|body|malla|bikini|corpino|sosten|bralette|palazzo|pantalon|rompeviento|chaleco|polera|camiseta|tanga|faja|activewear|fitness|pilates|yoga|running|gym|entrenamiento)/;
+function isSporty(p){
+  if(p.sector !== 'ropa') return false;
+  return SPORTY_RE.test(_norm([p.subcategory,p.name,p.description,p.material].join(' ')));
+}
+function autoNewTag(p){ return p.estado === 'Nuevo' && isSporty(p); }
+function showNewTag(p){
+  if(p.newTag === true) return true;
+  if(p.newTag === false) return false;
+  return autoNewTag(p);
+}
+const NEW_BADGE = '<span class="new-badge">NUEVO CON ETIQUETA</span>';
 function productTitle(p){
   const sub = (p.subcategory||'').trim();
   return sub ? `${sub} ${p.name}` : p.name;
@@ -823,6 +848,7 @@ function productCardHtml(p){
   return `<div class="card" data-detail="${p.id}">
     <div class="card-img">
       ${img ? `<img src="${img}" loading="lazy" />` : `<span style="color:#b8ab9c; font-size:11px;">sin foto</span>`}
+      ${showNewTag(p) ? NEW_BADGE : ''}
       <span class="price-tag" style="background:${(PALETTES[sectionById(p.sector)?.theme]||PALETTES.rosa).a1};">${fmtPrice(p.price)}</span>
     </div>
     <div class="card-body">
@@ -872,7 +898,7 @@ function openDetailOverlay(){
   container.innerHTML = `
     <div class="detail-modal">
       <div class="panel-head"><h3>${productTitle(p)}</h3><button class="close-x" id="detail-close">${ICONS.close}</button></div>
-      <div class="detail-imgs">${imgs.length ? imgs.map((src,i)=>`<img src="${src}" data-lightbox="${i}" />`).join('') : `<div style="width:100%;height:280px;background:#eee5da;display:flex;align-items:center;justify-content:center;color:#a89a89;font-size:13px;">Sin fotos todavía</div>`}</div>
+      <div class="detail-imgs-wrap">${showNewTag(p) ? NEW_BADGE : ''}<div class="detail-imgs">${imgs.length ? imgs.map((src,i)=>`<img src="${src}" data-lightbox="${i}" />`).join('') : `<div style="width:100%;height:280px;background:#eee5da;display:flex;align-items:center;justify-content:center;color:#a89a89;font-size:13px;">Sin fotos todavía</div>`}</div></div>
       <div class="detail-body">
         <div class="detail-price">${fmtPrice(p.price)}</div>
         ${p.description ? `<div class="detail-desc">${p.description}</div>` : ''}
@@ -1291,6 +1317,14 @@ function renderProductFormOverlay(){
             <div class="radio-opt ${p.estado==='Usado'?'active':''}" data-estado="Usado">Usado</div>
           </div>
         </div>
+        <div class="field"><label>Cartel "NUEVO CON ETIQUETA" sobre la foto</label>
+          <select id="pf-newtag">
+            <option value="auto" ${p.newTag==null?'selected':''}>Automático (ropa deportiva en estado Nuevo)</option>
+            <option value="on" ${p.newTag===true?'selected':''}>Mostrar siempre</option>
+            <option value="off" ${p.newTag===false?'selected':''}>No mostrar</option>
+          </select>
+          ${HAS_NEW_TAG ? '' : '<div style="font-size:12px;color:#b4533a;margin-top:6px;">Para poder guardar esta opción falta correr un SQL en Supabase (te lo pasó Claude). Mientras tanto, el cartel sigue el modo automático.</div>'}
+        </div>
         <div class="field"><label>Material</label><input id="pf-material" value="${p.material||''}" /></div>
         <div class="field"><label>Medidas (si aplica)</label><input id="pf-medidas" value="${p.medidas||''}" /></div>
         <div class="field"><label>Precio</label><input id="pf-price" type="number" value="${p.price||''}" /></div>
@@ -1547,6 +1581,7 @@ function attachAdminEvents(){
         medidas: document.getElementById('pf-medidas').value.trim(),
         price,
         quantity: Math.max(1, Number(document.getElementById('pf-quantity').value)||1),
+        newTag: ({on:true, off:false}[document.getElementById('pf-newtag').value]) ?? null,
       };
       const existingId = isNewProd ? null : productFormEdit.id;
       const savedId = await saveProduct(data, productFormImages, cleanVariants, existingId);
