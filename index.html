@@ -255,6 +255,15 @@ a{color:inherit;}
 }
 .primary-btn:active{transform:scale(.98);}
 .ghost-btn{background:#f2ede6; color:var(--ink); padding:12px; border-radius:14px; font-size:14px; text-align:center;}
+.offer-ov{position:fixed; inset:0; background:rgba(15,12,10,.6); z-index:320; display:flex; align-items:flex-end; justify-content:center;}
+@media (min-width:700px){ .offer-ov{align-items:center;} }
+.offer-box{background:#fffdf9; width:100%; max-width:440px; border-radius:20px 20px 0 0; padding:22px 20px 24px; max-height:92vh; overflow:auto;}
+@media (min-width:700px){ .offer-box{border-radius:20px;} }
+.offer-box h3{font-family:'Poppins'; font-size:19px; margin:0 0 6px;}
+.offer-note{background:#fdf1e3; border-radius:12px; padding:11px 13px; font-size:13.5px; line-height:1.45; margin:10px 0 14px;}
+.offer-box input{width:100%; padding:12px; border:1px solid #e2dbcf; border-radius:12px; font-size:16px; margin-top:4px;}
+.offer-box label{font-size:12.5px; color:var(--ink-soft); display:block; margin-top:10px;}
+.offer-warn{font-size:12.5px; color:#b4533a; margin-top:6px; min-height:16px;}
 .lightbox{
   position:fixed; inset:0; background:rgba(15,12,10,.94); z-index:300;
   display:flex; align-items:center; justify-content:center; padding:24px;
@@ -936,6 +945,43 @@ function productCardHtml(p){
 /* ============================================================
    DETAIL OVERLAY
    ============================================================ */
+// Ofertas: en todo menos la ropa nueva
+function canOffer(p){ return !(p.sector === 'ropa' && p.estado === 'Nuevo'); }
+function openOfferModal(p){
+  const ov = document.createElement('div');
+  ov.className = 'offer-ov';
+  ov.innerHTML = `<div class="offer-box">
+    <h3>Quiero hacer una oferta</h3>
+    <div style="font-size:14px;">${productTitle(p)} · precio publicado <b>${fmtPrice(p.price)}</b></div>
+    <div class="offer-note">Ofertá algo que tenga sentido. <b>No vamos a tener en cuenta ofertas demasiado bajas.</b> Es un sale por cierre y mudanza: te respondemos por WhatsApp si la aceptamos.</div>
+    <label>Tu oferta ($)</label>
+    <input id="offer-amount" type="number" inputmode="numeric" min="1" placeholder="Ej: ${Math.round(p.price*0.85/100)*100}" />
+    <div class="offer-warn" id="offer-warn"></div>
+    <label>Tu nombre (opcional)</label>
+    <input id="offer-name" type="text" placeholder="Nombre" />
+    <button class="primary-btn" id="offer-send" type="button" style="margin-top:16px;">Enviar oferta por WhatsApp</button>
+    <button class="ghost-btn" id="offer-cancel" type="button" style="width:100%; margin-top:8px;">Cancelar</button>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = ()=> ov.remove();
+  ov.onclick = (e)=>{ if(e.target===ov) close(); };
+  ov.querySelector('#offer-cancel').onclick = close;
+  const amt = ov.querySelector('#offer-amount'), warn = ov.querySelector('#offer-warn');
+  amt.oninput = ()=>{
+    const v = Number(amt.value);
+    warn.textContent = (v>0 && v < p.price*0.6) ? 'Ojo: es bastante menos que el precio publicado, puede que no se tenga en cuenta.' : '';
+  };
+  ov.querySelector('#offer-send').onclick = ()=>{
+    const v = Math.round(Number(amt.value));
+    if(!(v>0)){ warn.textContent = 'Escribí el monto de tu oferta.'; return; }
+    const nm = ov.querySelector('#offer-name').value.trim();
+    const msg = `Hola! Estoy interesado/a en este producto y tengo una oferta para hacerte:\n\n` +
+      `*${productTitle(p)}*\nPrecio publicado: ${fmtPrice(p.price)}\nMi oferta: ${fmtPrice(v)}` + (nm ? `\nNombre: ${nm}` : '');
+    window.open(`https://wa.me/${config.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+    close();
+  };
+  setTimeout(()=>amt.focus(), 50);
+}
 function openLightbox(src){
   const lb = document.createElement('div');
   lb.className = 'lightbox';
@@ -985,6 +1031,7 @@ function openDetailOverlay(){
           <button class="qty-btn" id="detail-qty-plus">+</button>
         </div>
         <button class="primary-btn" id="detail-add" ${hasVariants?'disabled style="opacity:.5;"':''}>${hasVariants ? 'Elegí un talle primero' : 'Lo quiero — agregar al carrito'}</button>
+        ${canOffer(p) && config.whatsapp ? `<button class="ghost-btn" id="detail-offer" type="button" style="width:100%; margin-top:10px;">🏷️ Quiero hacer una oferta</button>` : ''}
         ${config.whatsapp ? `<a class="ghost-btn" id="detail-ask" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; text-decoration:none;" href="https://wa.me/${config.whatsapp}?text=${encodeURIComponent('Hola! Quería hacerte una pregunta sobre este producto: '+productTitle(p)+' ('+fmtPrice(p.price)+')')}">${ICONS.whatsapp} Hacer una pregunta sobre este producto</a>` : ''}
       </div>
     </div>`;
@@ -993,6 +1040,8 @@ function openDetailOverlay(){
     img.onclick = ()=> openLightbox(img.src);
   });
   let qty = 1;
+  const offerBtn = container.querySelector('#detail-offer');
+  if(offerBtn) offerBtn.onclick = ()=> openOfferModal(p);
   const addBtn = container.querySelector('#detail-add');
   const updateMax = ()=>{
     const maxQ = hasVariants ? (selectedVariant ? Math.max(1, selectedVariant.quantity||1) : 1) : Math.max(1, p.quantity||1);
