@@ -181,6 +181,39 @@ a{color:inherit;}
 .card-body{padding:12px 13px 14px; display:flex; flex-direction:column; gap:8px; flex:1;}
 .card-name{font-family:'Poppins'; font-size:17.5px; font-weight:600; line-height:1.25; min-height:auto;}
 
+/* filtro por categoría */
+.cat-bar{padding:14px 22px 0; display:flex; align-items:center; gap:10px;}
+.cat-select-wrap{position:relative; flex:1; max-width:420px;}
+.cat-select{
+  width:100%; appearance:none; -webkit-appearance:none; background:#fff; border:1.5px solid var(--ink);
+  border-radius:26px; padding:13px 44px 13px 18px; font-family:'Poppins'; font-size:15px; font-weight:500; color:var(--ink);
+}
+.cat-select-wrap::after{
+  content:''; position:absolute; right:18px; top:50%; width:9px; height:9px; margin-top:-7px;
+  border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:rotate(45deg); pointer-events:none;
+}
+.cat-count{font-size:13px; color:var(--ink-soft); white-space:nowrap;}
+
+/* celular: 2 productos por fila y se sigue hacia abajo */
+@media (max-width: 699px){
+  .group-block{padding:18px 0 4px;}
+  .group-title{padding:0 14px 10px; font-size:18px;}
+  .row-scroll{
+    display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px;
+    overflow-x:visible; padding:2px 12px 12px; scroll-snap-type:none;
+  }
+  .card{flex:none; width:100%; border-radius:14px;}
+  .card-img{height:auto; aspect-ratio:3/4;}
+  .card-body{padding:9px 10px 11px; gap:6px;}
+  .card-name{font-size:14px; line-height:1.25;}
+  .price-tag{font-size:13px; padding:4px 9px; left:7px; bottom:7px;}
+  .more-photos{font-size:11px; padding:3px 8px; right:6px; bottom:7px;}
+  .more-photos svg{width:12px; height:12px;}
+  .new-badge{font-size:9px; padding:4px 7px 4px 6px; top:8px;}
+  .tag{font-size:10px; padding:2px 7px;}
+  .want-btn{padding:8px; font-size:13px;}
+  .cat-bar{padding:12px 14px 0;}
+}
 @media (min-width: 700px){
   .row-scroll{
     display:grid;
@@ -412,6 +445,7 @@ let orders = [];
 let cart = [];        // [{id, qty}]
 let view = 'loading'; // loading | home | section | admin-login | admin
 let currentSection = null;
+let currentSub = '';
 let adminAuthed = false;
 let adminSession = null;
 let adminTab = 'productos';
@@ -894,12 +928,25 @@ function renderSectionPage(){
     groups[key].push(p);
   });
   const groupKeys = Object.keys(groups);
+  if(currentSub && !groups[currentSub]) currentSub = '';
+  const shownKeys = currentSub ? [currentSub] : groupKeys;
+  const shownCount = shownKeys.reduce((a,k)=>a+groups[k].length,0);
+  const filterBar = groupKeys.length > 1 ? `
+    <div class="cat-bar" id="cat-bar">
+      <div class="cat-select-wrap">
+        <select class="cat-select" id="sub-filter" aria-label="Ver por categoría">
+          <option value="">Todas las categorías (${products.length})</option>
+          ${groupKeys.map(k=>`<option value="${k.replace(/"/g,'&quot;')}" ${k===currentSub?'selected':''}>${k} (${groups[k].length})</option>`).join('')}
+        </select>
+      </div>
+      <span class="cat-count">${shownCount} ${shownCount===1?'producto':'productos'}</span>
+    </div>` : '';
 
   let body;
   if(products.length === 0){
     body = `<div class="empty-note">Todavía no hay productos cargados en ${s.label.toLowerCase()}. Volvé pronto 🌿</div>`;
   }else{
-    body = groupKeys.map(key=>{
+    body = shownKeys.map(key=>{
       const cards = groups[key].map(p=> productCardHtml(p)).join('');
       return `<div class="group-block">
         <div class="group-title">${key}</div>
@@ -914,6 +961,7 @@ function renderSectionPage(){
     <h2 class="section-title">${s.label}</h2>
   </div>
   ${(config.promos||[]).filter(pr=>pr.sector===s.id).map(pr=>`<div class="promo-banner">🔥 ${pr.label}</div>`).join('')}
+  ${filterBar}
   ${body}
   `;
 }
@@ -1236,8 +1284,14 @@ function attachCommonEvents(){
   const cartBtn = document.getElementById('btn-cart');
   if(cartBtn) cartBtn.onclick = ()=>{ cartOpenFlag=true; renderCartOverlay(); };
   document.querySelectorAll('[data-goto]').forEach(t=>{
-    t.onclick = ()=>{ currentSection = t.dataset.goto; view='section'; render(); };
+    t.onclick = ()=>{ currentSection = t.dataset.goto; currentSub = ''; view='section'; render(); };
   });
+  const subFilter = document.getElementById('sub-filter');
+  if(subFilter) subFilter.onchange = ()=>{
+    currentSub = subFilter.value; render();
+    const bar = document.getElementById('cat-bar');
+    if(bar) window.scrollTo({top: bar.getBoundingClientRect().top + window.scrollY - 70});
+  };
   const back = document.getElementById('btn-back-home');
   if(back) back.onclick = goHome;
   const adminLink = document.getElementById('btn-admin-link');
