@@ -11,7 +11,7 @@
 
 :root{
   --a1:#f3c9dc; --a2:#d9a6c2; --a3:#efe3d0; --tx:#3a2630;
-  --cream:#fbf5ea; --ink:#3a2417; --ink-soft:#7a5f4e; --canyon:#DF6D41; --butter:#F7D89A; --sky:#8DA6CC; --olive:#AAA648; --brown:#3a2417; --paper:#fff8ea; --mono:'DM Mono',ui-monospace,monospace;
+  --cream:#fbf5ea; --ink:#3a2417; --ink-soft:#7a5f4e; --canyon:#F08C21; --butter:#F2D88F; --sky:#B9D0D8; --olive:#B4B534; --blush:#E36888; --sea:#6698CC; --brown:#3a2417; --paper:#fff8ea; --mono:'DM Mono',ui-monospace,monospace;
   --radius:22px;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
@@ -75,11 +75,11 @@ a{color:inherit;}
   font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-weight:400; font-size:clamp(30px, 8.5vw, 46px);
   line-height:1.05; margin:4px 0 8px;
 }
-.hero-home{background:var(--canyon); color:var(--paper);}
+.hero-home{background:var(--canyon); color:#3a1a00;}
 .hero-home .hero-title{font-weight:600; letter-spacing:-.8px;}
 .hero-pills{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;}
-.hero-pills span{background:var(--butter); color:var(--brown); font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-weight:600; font-size:12px; letter-spacing:.08em; padding:6px 12px; border-radius:20px;}
-.hero-pills span.soft{background:rgba(255,248,234,.22); color:var(--paper); letter-spacing:.02em; font-weight:500; font-size:13px;}
+.hero-pills span{background:var(--brown); color:var(--butter); font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-weight:600; font-size:12px; letter-spacing:.08em; padding:6px 12px; border-radius:20px;}
+.hero-pills span.soft{background:rgba(58,36,23,.14); color:#3a1a00; letter-spacing:.02em; font-weight:500; font-size:13px;}
 
 .info-grid{
   display:grid; grid-template-columns:repeat(auto-fit, minmax(175px,1fr)); gap:8px;
@@ -87,10 +87,10 @@ a{color:inherit;}
 }
 @media (max-width:699px){ .info-grid{grid-template-columns:repeat(2, minmax(0,1fr));} }
 .info-card{border-radius:14px; padding:12px 14px 13px; color:var(--brown);}
-.info-card:nth-child(4n+1){background:#f8e0a8;}
-.info-card:nth-child(4n+2){background:#d9e3f2;}
-.info-card:nth-child(4n+3){background:#e6e4ae;}
-.info-card:nth-child(4n+4){background:#f6d1bf;}
+.info-card:nth-child(4n+1){background:#fbdde6;}
+.info-card:nth-child(4n+2){background:#dde9f5;}
+.info-card:nth-child(4n+3){background:#fbf1d3;}
+.info-card:nth-child(4n+4){background:#f0f0c0;}
 .info-card .info-title{display:block; font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-weight:700; font-size:14px; letter-spacing:.2px;}
 .info-card .info-text{font-size:12px; line-height:1.4; color:#5b4232; margin-top:5px;}
 
@@ -126,10 +126,6 @@ a{color:inherit;}
   display:flex; flex-direction:column; justify-content:space-between; text-align:right;
   transition:transform .15s ease;
 }
-.tile-canyon{background:var(--canyon); color:var(--paper);}
-.tile-butter{background:var(--butter); color:var(--brown);}
-.tile-sky{background:var(--sky); color:#1f2b44;}
-.tile-olive{background:var(--olive); color:#2b2a0c;}
 .tile::after{
   content:'↗'; position:absolute; right:12px; bottom:10px; font-size:17px; opacity:.75;
 }
@@ -204,7 +200,13 @@ a{color:inherit;}
 .card-name{font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17.5px; font-weight:600; line-height:1.25; min-height:auto;}
 
 /* filtro por categoría */
-.cat-bar{padding:16px 22px 4px; display:flex; flex-wrap:wrap; gap:8px;}
+.cat-head{
+  margin:18px 22px 0; padding:0 0 10px; border-bottom:2px solid var(--brown);
+  font-size:15px; color:var(--brown); display:flex; flex-wrap:wrap; gap:4px 8px; align-items:baseline;
+}
+.cat-head b{font-size:20px; font-weight:800; letter-spacing:-.3px;}
+.section-index .cat-head-home{margin:0 2px 14px;}
+.cat-bar{padding:14px 22px 4px; display:flex; flex-wrap:wrap; gap:8px;}
 .cat-chip{
   padding:9px 16px; border-radius:22px; font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:15px; font-weight:700;
   background:#fff; color:var(--brown); border:2px solid var(--brown); display:inline-flex; align-items:center; gap:7px;
@@ -231,6 +233,7 @@ a{color:inherit;}
   .new-badge{font-size:9px; padding:4px 7px 4px 6px; top:8px;}
   .tag{font-size:10px; padding:2px 7px;}
   .want-btn{padding:8px; font-size:13px;}
+  .cat-head{margin:16px 14px 0;}
   .cat-bar{padding:12px 14px 2px; gap:7px;}
   .cat-chip{padding:8px 13px; font-size:14px;}
 }
@@ -767,10 +770,12 @@ function uid(){
 }
 function sectionById(id){ return (config.sections||[]).find(s=>s.id===id); }
 const SEC_KINDS = [
-  {main:'#F7D89A', soft:'#fdf0d2', on:'#3a2417'},   // Buttercream
-  {main:'#8DA6CC', soft:'#e3ebf6', on:'#1f2b44'},   // Morning Sky
-  {main:'#AAA648', soft:'#eeedc4', on:'#2b2a0c'},   // Olive Grove
-  {main:'#DF6D41', soft:'#f9dccd', on:'#fff8ea'},   // Canyon
+  {main:'#E36888', soft:'#fbdde6', on:'#3d0f21'},   // Blush
+  {main:'#6698CC', soft:'#dde9f5', on:'#0b2038'},   // Sea
+  {main:'#F2D88F', soft:'#fbf1d3', on:'#3a2417'},   // Butter
+  {main:'#B4B534', soft:'#f0f0c0', on:'#2b2a0c'},   // Matcha
+  {main:'#B9D0D8', soft:'#e6eef1', on:'#1d3440'},   // Sky
+  {main:'#F08C21', soft:'#fce3c4', on:'#3a1a00'},   // Tangerine
 ];
 function secVars(sectorId){
   const i = Math.max(0, (config.sections||[]).findIndex(x=>x.id===sectorId));
@@ -894,8 +899,8 @@ function renderHome(){
   const vars = themeVars('rosa');
   const tiles = sections.map((s,i)=>{
     const count = catalog.filter(p=>p.sector===s.id && p.stock).length;
-    const kind = ['butter','sky','olive','canyon'][i % 4];
-    return `<button class="tile tile-${kind}" data-goto="${s.id}">
+    const k = SEC_KINDS[i % SEC_KINDS.length];
+    return `<button class="tile" style="background:${k.main}; color:${k.on};" data-goto="${s.id}">
       <span class="tile-name">${s.label}</span>
       <span class="tile-count">${count} ${count===1?'producto':'productos'}</span>
     </button>`;
@@ -921,7 +926,7 @@ function renderHome(){
   </div>
 
   <div class="section-index">
-    <div class="index-label">Elegí qué querés ver</div>
+    <div class="cat-head cat-head-home"><b>¿Qué querés ver?</b> Hacé click sobre la categoría</div>
     <div class="tile-grid">${tiles}</div>
   </div>
 
@@ -959,6 +964,7 @@ function renderSectionPage(){
   const shownCount = shownKeys.reduce((a,k)=>a+groups[k].length,0);
   const esc = k=>k.replace(/"/g,'&quot;');
   const filterBar = groupKeys.length > 1 ? `
+    <div class="cat-head" id="cat-head"><b>¿Qué querés ver?</b> Hacé click sobre la categoría</div>
     <div class="cat-bar" id="cat-bar">
       <button class="cat-chip ${currentSub===''?'on':''}" data-sub="">Todo <span>${products.length}</span></button>
       ${groupKeys.map(k=>`<button class="cat-chip ${k===currentSub?'on':''}" data-sub="${esc(k)}">${k} <span>${groups[k].length}</span></button>`).join('')}
@@ -1315,7 +1321,7 @@ function attachCommonEvents(){
   document.querySelectorAll('.cat-chip').forEach(ch=>{
     ch.onclick = ()=>{
       currentSub = ch.dataset.sub; render();
-      const bar = document.getElementById('cat-bar');
+      const bar = document.getElementById('cat-head');
       if(bar) window.scrollTo({top: bar.getBoundingClientRect().top + window.scrollY - 70});
     };
   });
