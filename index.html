@@ -191,7 +191,6 @@ a{color:inherit;}
 .sec-page .want-btn{background:var(--sec); color:var(--sec-on); font-weight:700; box-shadow:0 3px 0 var(--brown);}
 .sec-page .tag{background:var(--sec-soft); color:var(--brown);}
 .sec-page .promo-banner{background:var(--sec); color:var(--sec-on); font-weight:700;}
-.sec-page .cat-select{border-color:var(--brown);}
 @media (max-width:699px){ .sec-page .group-title{margin:0 14px 10px;} }
 .sec-detail .panel-head{background:var(--sec); color:var(--sec-on);}
 .sec-detail .detail-price{color:var(--brown);}
@@ -205,17 +204,14 @@ a{color:inherit;}
 .card-name{font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:17.5px; font-weight:600; line-height:1.25; min-height:auto;}
 
 /* filtro por categoría */
-.cat-bar{padding:14px 22px 0; display:flex; align-items:center; gap:10px;}
-.cat-select-wrap{position:relative; flex:1; max-width:420px;}
-.cat-select{
-  width:100%; appearance:none; -webkit-appearance:none; background:#fff; border:1.5px solid var(--ink);
-  border-radius:26px; padding:13px 44px 13px 18px; font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:15px; font-weight:500; color:var(--ink);
+.cat-bar{padding:16px 22px 4px; display:flex; flex-wrap:wrap; gap:8px;}
+.cat-chip{
+  padding:9px 16px; border-radius:22px; font-family:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif; font-size:15px; font-weight:700;
+  background:#fff; color:var(--brown); border:2px solid var(--brown); display:inline-flex; align-items:center; gap:7px;
 }
-.cat-select-wrap::after{
-  content:''; position:absolute; right:18px; top:50%; width:9px; height:9px; margin-top:-7px;
-  border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:rotate(45deg); pointer-events:none;
-}
-.cat-count{font-size:13px; color:var(--ink-soft); white-space:nowrap;}
+.cat-chip span{font-family:var(--mono); font-size:11.5px; font-weight:500; opacity:.7;}
+.cat-chip.on{background:var(--sec,#F7D89A); color:var(--sec-on,#3a2417); box-shadow:0 3px 0 var(--brown);}
+.cat-chip:active{transform:scale(.96);}
 
 /* celular: 2 productos por fila y se sigue hacia abajo */
 @media (max-width: 699px){
@@ -235,7 +231,8 @@ a{color:inherit;}
   .new-badge{font-size:9px; padding:4px 7px 4px 6px; top:8px;}
   .tag{font-size:10px; padding:2px 7px;}
   .want-btn{padding:8px; font-size:13px;}
-  .cat-bar{padding:12px 14px 0;}
+  .cat-bar{padding:12px 14px 2px; gap:7px;}
+  .cat-chip{padding:8px 13px; font-size:14px;}
 }
 @media (min-width: 700px){
   .row-scroll{
@@ -960,15 +957,11 @@ function renderSectionPage(){
   if(currentSub && !groups[currentSub]) currentSub = '';
   const shownKeys = currentSub ? [currentSub] : groupKeys;
   const shownCount = shownKeys.reduce((a,k)=>a+groups[k].length,0);
+  const esc = k=>k.replace(/"/g,'&quot;');
   const filterBar = groupKeys.length > 1 ? `
     <div class="cat-bar" id="cat-bar">
-      <div class="cat-select-wrap">
-        <select class="cat-select" id="sub-filter" aria-label="Ver por categoría">
-          <option value="">Todas las categorías (${products.length})</option>
-          ${groupKeys.map(k=>`<option value="${k.replace(/"/g,'&quot;')}" ${k===currentSub?'selected':''}>${k} (${groups[k].length})</option>`).join('')}
-        </select>
-      </div>
-      <span class="cat-count">${shownCount} ${shownCount===1?'producto':'productos'}</span>
+      <button class="cat-chip ${currentSub===''?'on':''}" data-sub="">Todo <span>${products.length}</span></button>
+      ${groupKeys.map(k=>`<button class="cat-chip ${k===currentSub?'on':''}" data-sub="${esc(k)}">${k} <span>${groups[k].length}</span></button>`).join('')}
     </div>` : '';
 
   let body;
@@ -1319,12 +1312,13 @@ function attachCommonEvents(){
   document.querySelectorAll('[data-goto]').forEach(t=>{
     t.onclick = ()=>{ currentSection = t.dataset.goto; currentSub = ''; view='section'; render(); };
   });
-  const subFilter = document.getElementById('sub-filter');
-  if(subFilter) subFilter.onchange = ()=>{
-    currentSub = subFilter.value; render();
-    const bar = document.getElementById('cat-bar');
-    if(bar) window.scrollTo({top: bar.getBoundingClientRect().top + window.scrollY - 70});
-  };
+  document.querySelectorAll('.cat-chip').forEach(ch=>{
+    ch.onclick = ()=>{
+      currentSub = ch.dataset.sub; render();
+      const bar = document.getElementById('cat-bar');
+      if(bar) window.scrollTo({top: bar.getBoundingClientRect().top + window.scrollY - 70});
+    };
+  });
   const back = document.getElementById('btn-back-home');
   if(back) back.onclick = goHome;
   const adminLink = document.getElementById('btn-admin-link');
